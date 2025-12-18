@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, ComposedChart, Bar } from "recharts";
-import { AlertCircle, ArrowDown, ArrowUp, Info, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Info, RefreshCw, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ export default function VixTermStructure() {
     queryFn: () => fetchVixHistory(period),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
+    retry: false, // Don't retry on error (likely missing API key)
   });
 
   if (isLoading) {
@@ -43,20 +44,39 @@ export default function VixTermStructure() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading VIX data from Yahoo Finance...</p>
+          <p className="text-muted-foreground">Loading VIX data from FRED...</p>
         </div>
       </div>
     );
   }
 
   if (isError) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch VIX data';
+    const isMissingApiKey = errorMessage.includes('FRED_API_KEY');
+    
     return (
       <div className="flex items-center justify-center h-96">
-        <Card className="max-w-md border-destructive/50">
+        <Card className="max-w-lg border-amber-500/50 bg-amber-500/5">
           <CardHeader>
-            <CardTitle className="text-destructive">Error Loading Data</CardTitle>
-            <CardDescription>
-              {error instanceof Error ? error.message : 'Failed to fetch VIX data'}
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-amber-500">
+                {isMissingApiKey ? 'API Key Required' : 'Error Loading Data'}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-foreground/80 mt-2">
+              {isMissingApiKey ? (
+                <>
+                  To display real VIX data, you need a free FRED API key.
+                  <ol className="list-decimal list-inside mt-3 space-y-2 text-sm">
+                    <li>Go to <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" rel="noopener noreferrer" className="text-primary underline">fred.stlouisfed.org</a></li>
+                    <li>Create a free account and request an API key</li>
+                    <li>Add it as a secret named <code className="bg-muted px-1 py-0.5 rounded text-xs">FRED_API_KEY</code></li>
+                  </ol>
+                </>
+              ) : (
+                errorMessage
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -185,7 +205,10 @@ export default function VixTermStructure() {
       <Card className="border-border/50 bg-card/50 backdrop-blur">
         <CardHeader>
             <CardTitle>VIX vs VIX3M History</CardTitle>
-            <CardDescription>Comparing short-term vs medium-term volatility expectations</CardDescription>
+            <CardDescription>
+              Comparing short-term vs medium-term volatility expectations
+              <span className="ml-2 text-xs text-muted-foreground">• Last update: {format(parseISO(latest.date), "MMM dd, yyyy")}</span>
+            </CardDescription>
         </CardHeader>
         <CardContent>
             <div className="h-[400px] w-full">
@@ -307,7 +330,7 @@ export default function VixTermStructure() {
                         This indicator tracks that slope and its statistical significance (Z-Score) to flag potential crisis events.
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                        Data refreshes every 5 minutes • Source: Yahoo Finance (CBOE VIX Indices)
+                        Data updates daily (EOD) • Source: Federal Reserve Economic Data (FRED)
                     </p>
                 </div>
             </div>
