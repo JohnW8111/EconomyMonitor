@@ -307,13 +307,35 @@ export default function VixTermStructure() {
         <Card>
             <CardHeader>
                 <CardTitle>Slope Z-Score (Rolling 1-Year)</CardTitle>
-                <CardDescription>Standard deviations from the mean (showing last {zScoreData.length} days with calculated Z-scores)</CardDescription>
+                <CardDescription>Standard deviations from the mean ({zScoreData.length} data points)</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
                     {zScoreData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                          <BarChartWrapper data={zScoreData} />
+                          <ComposedChart data={zScoreData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                              <XAxis 
+                                  dataKey="date" 
+                                  stroke="hsl(var(--muted-foreground))" 
+                                  fontSize={12}
+                                  tickFormatter={(str) => format(parseISO(str), "MMM yy")}
+                                  minTickGap={40}
+                              />
+                              <YAxis 
+                                  stroke="hsl(var(--muted-foreground))" 
+                                  fontSize={12}
+                                  domain={[-8, 2]}
+                              />
+                              <Tooltip content={<CustomTooltip />} />
+                              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                              <ReferenceLine y={-2} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
+                              <Bar 
+                                  dataKey="slopeZScore" 
+                                  name="Z-Score"
+                                  fill="hsl(var(--primary))"
+                              />
+                          </ComposedChart>
                       </ResponsiveContainer>
                     ) : (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
