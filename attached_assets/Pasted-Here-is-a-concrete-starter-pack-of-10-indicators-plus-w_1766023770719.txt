@@ -1,0 +1,271 @@
+Here is a concrete “starter pack” of 10 indicators, plus where you can actually pull each one. I’ll keep it to data you can either get for free or approximate reasonably without a Bloomberg terminal.
+
+---
+
+## 1. Equity Volatility Term Structure (VIX vs 3M VIX)
+
+**What:**
+
+* Spot VIX (1-month implied volatility on S&P 500 options).
+* 3-month VIX (VIX3M).
+* Use the **slope** = VIX3M – VIX as your indicator (backwardation vs contango).
+
+**Why:**
+
+* When front-month volatility spikes above 3M (backwardation), it’s often a sign of acute stress.
+
+**Where to get it (free-ish):**
+
+* CBOE publishes VIX and VIX3M quotes and historical data.
+* Many brokers / charting platforms (TradingView, etc.) provide these tickers in real time:
+
+  * `^VIX` and `^VIX3M` on Yahoo Finance.
+
+**Implementation note:**
+
+* Download daily close from Yahoo (via yfinance or similar) and compute `VIX3M – VIX` + z-score.
+
+---
+
+## 2. Rates Volatility (MOVE Index)
+
+**What:**
+
+* ICE BofA MOVE Index = implied volatility on US Treasuries across key maturities.
+
+**Why:**
+
+* Spikes often precede or coincide with big macro/bond shocks that later hit equities.
+
+**Where:**
+
+* ICE and many data vendors publish the index.
+* Public ticker on Yahoo Finance: `^MOVE`.
+* ICE provides methodology and sometimes historical charts on their site.
+
+**Implementation note:**
+
+* Same as VIX: track level and z-score vs 5–10 year history.
+
+---
+
+## 3. High-Yield Credit Spread (HY OAS)
+
+**What:**
+
+* Option-adjusted spread of US high-yield corporate bonds over Treasuries.
+
+**Why:**
+
+* Credit stress is one of the best early warnings for broader risk-off.
+
+**Where (free):**
+
+* The St. Louis Fed (FRED) has a series such as:
+
+  * **BAMLH0A0HYM2** (“ICE BofA US High Yield Index Option-Adjusted Spread”) with daily data.
+
+**Implementation note:**
+
+* Pull from FRED API, track level and change; z-score vs history.
+
+---
+
+## 4. HY vs IG Credit Spread Ratio
+
+**What:**
+
+* Ratio of high-yield spread to investment-grade spread (HY OAS / IG OAS).
+
+**Why:**
+
+* Shows whether stress is concentrated in riskier credit; a rising ratio is often more informative than levels alone.
+
+**Where (free):**
+
+* FRED has an IG OAS series, e.g.:
+
+  * **BAMLC0A0CM** or similar ICE BofA US Corporate IG OAS series.
+
+**Implementation note:**
+
+* Pull both HY and IG spreads from FRED and compute the ratio.
+* Normalize that ratio over time (z-score).
+
+---
+
+## 5. FRA–OIS or TED Spread (Funding Stress)
+
+**What:**
+
+* **TED spread**: 3-month LIBOR (now SOFR-linked equivalents) minus 3-month Treasury bill yield.
+* Or a more modern variant: 3M FRA – 3M OIS spread.
+
+**Why:**
+
+* Measures perceived bank/credit risk vs “risk-free” government bills; spikes → interbank stress.
+
+**Where (free / approximate):**
+
+* FRED has TED spread series, e.g. **TEDRATE** (historical TBILL vs LIBOR).
+* You can approximate FRA–OIS using futures and OIS rate data if you have access via brokerage or paid data.
+
+**Implementation note:**
+
+* For a DIY early warning, using the FRED TEDRATE is usually sufficient.
+
+---
+
+## 6. HY Bond ETF Discount/Premium to NAV
+
+**What:**
+
+* Discount/premium of large HY ETFs (e.g., HYG, JNK) vs their net asset values.
+
+**Why:**
+
+* Persistent discount (ETF trading below NAV) indicates **liquidity stress**: underlying bonds are harder to trade than the ETF.
+
+**Where:**
+
+* ETF providers (iShares for HYG, State Street for JNK) publish **daily NAV and closing price**.
+* Many brokers expose this data, or you can scrape/public APIs where allowed.
+
+**Implementation note:**
+
+* Compute `(Price – NAV) / NAV` daily.
+* Track both level and multi-day persistence of negative values.
+
+---
+
+## 7. Yield Curve Slope (3m–10y or 2s–10s)
+
+**What:**
+
+* Difference between long and short rates, e.g.:
+
+  * 10-year Treasury yield minus 3-month T-bill yield (10y – 3m), or
+  * 10-year minus 2-year (2s10s).
+
+**Why:**
+
+* Inversion is a classic recession predictor; **re-steepening from inversion** often coincides with transition toward real pain.
+
+**Where (free):**
+
+* FRED has both:
+
+  * 10-year constant maturity: **DGS10**
+  * 2-year: **DGS2**
+  * 3-month: **DGS3MO**
+
+**Implementation note:**
+
+* Compute slope daily and monitor:
+
+  * Is curve inverted?
+  * Is it steepening rapidly?
+
+---
+
+## 8. Equity Risk Premium Proxy (Earnings Yield – Real Yield)
+
+**What:**
+
+* Simple approximation:
+
+  * S&P 500 **earnings yield** (1 / P/E or forward E/P)
+    – 10-year **real yield** (e.g., via TIPS).
+
+**Why:**
+
+* When this gets very compressed, equities are “priced for perfection”; any shock elsewhere (credit, macro) can do more damage.
+
+**Where:**
+
+* S&P 500 earnings yield / P/E:
+
+  * S&P Global / multpl.com type sites have long-term P/E data (historical Shiller CAPE and regular P/E).
+* 10-year TIPS yield from FRED:
+
+  * **DFII10** (10-Year Treasury Inflation-Indexed Security).
+
+**Implementation note:**
+
+* Don’t treat this as timing; use as a **background fragility score** or multiplier on your other indicators.
+
+---
+
+## 9. Equity Index Put–Call Ratio (Positioning / Hedging Tone)
+
+**What:**
+
+* Put–call volume or open interest ratio for **index** options (SPX/SPY), not single stocks.
+
+**Why:**
+
+* Very low index put–call → complacency / call-chasing.
+* Very high levels could either be fear or heavy hedging, depending on context—but extremes are still informative.
+
+**Where:**
+
+* CBOE publishes daily put–call ratio data for index options and for total markets.
+* Some brokers expose these time series via API or data downloads.
+
+**Implementation note:**
+
+* Track index put–call vs its own 5–10y history (z-score).
+* Consider also **equity-only** put–call; divergence between the two can be interesting.
+
+---
+
+## 10. Broad Financial Conditions Index (One Composite Input)
+
+**What:**
+
+* A pre-built **financial conditions index (FCI)** that aggregates rates, spreads, FX, and equity moves into a single score.
+
+**Why:**
+
+* Gives you a “big picture” context without rebuilding everything from scratch.
+* Can serve as a sanity check on your custom composite.
+
+**Where:**
+
+* Chicago Fed **National Financial Conditions Index (NFCI)** via FRED:
+
+  * Weekly data, with historical series available.
+* Other FCIs (Goldman Sachs, etc.) tend to be paywalled or only partially public.
+
+**Implementation note:**
+
+* Pull NFCI weekly; compare its z-score to your own composite to see when they diverge.
+
+---
+
+## How This Fits Together
+
+With these 10 indicators you have:
+
+* **Volatility:** VIX term structure, MOVE
+* **Credit:** HY OAS, HY/IG spread ratio
+* **Funding & Liquidity:** TED/FRA–OIS, HY ETF discount/premium
+* **Macro/Curve:** Yield curve slope, NFCI
+* **Valuation / Fragility:** Equity risk premium proxy
+* **Positioning / Sentiment:** Index put–call ratio
+
+In a next step, we can:
+
+1. Assign each indicator to a “bucket” (vol, credit, etc.).
+2. Normalize each series (rolling z-scores).
+3. Build a simple composite “Risk Regime Score” in Python, with logic such as:
+
+   * Equal-weighted z-scores by bucket.
+   * Optional multiplier when valuation fragility is high.
+4. Backtest against forward drawdowns in S&P or your own portfolio.
+
+If you would like, I can draft a small Python sketch that:
+
+* pulls a subset of these (say from FRED + Yahoo),
+* computes z-scores, and
+* outputs a daily composite “risk regime” series that you can experiment with.

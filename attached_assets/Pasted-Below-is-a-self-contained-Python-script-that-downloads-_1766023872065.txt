@@ -1,0 +1,199 @@
+Below is a self-contained Python script that:
+
+* downloads daily closes for **^VIX** and **^VIX3M** (Yahoo Finance via `yfinance`)
+* computes **term-structure slope** = `VIX3M – VIX`
+* computes a **rolling z-score** of the slope (default 252 trading days)
+* prints the most recent rows and shows a simple plot
+
+```python
+#!/usr/bin/env python3
+"""
+VIX term structure monitor: VIX3M - VIX (slope) + rolling z-score.
+
+Data source: Yahoo Finance via yfinance
+Tickers (Yahoo): ^VIX, ^VIX3M
+
+Usage examples:
+  python vix_term_structure.py
+  python vix_term_structure.py --period 5y --zwin 252 --tail 30
+  python vix_term_structure.py --start 2015-01-01 --zwin 126
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import datetime
+from typing import Optional, Tuple
+
+import pandas as pd
+
+# yfinance and matplotlib are external deps
+try:
+    import yfinance as yf
+except ImportError:
+    print("Missing dependency: yfinance. Install with: pip install yfinance", file=sys.stderr)
+    raise
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("Missing dependency: matplotlib. Install with: pip install matplotlib", file=sys.stderr)
+    raise
+
+
+def fetch_series(
+    ticker: str,
+    start: Optional[str] = None,
+    period: Optional[str] = "5y",
+) -> pd.Series:
+    """
+    Fetch Adj Close (or Close fallback) for a given ticker from Yahoo via yfinance.
+    Returns a pandas Series indexed by date.
+    """
+    kwargs = {"progress": False}
+    if start:
+        kwargs["start"] = start
+        data = yf.download(ticker, **kwargs)
+    else:
+        data = yf.download(ticker, period=period, **kwargs)
+
+    if data is None or data.empty:
+        raise ValueError(f"No data returned for ticker {ticker}.")
+    col = "Adj Close" if "Adj Close" in data.columns else "Close"
+    s = data[col].copy()
+    s.name = ticker
+    return s
+
+
+def fetch_vix_and_vix3m(
+    start: Optional[str] = None,
+    period: str = "5y",
+) -> Tuple[pd.Series, pd.Series]:
+    """
+    Fetch ^VIX and ^VIX3M. Includes a small fallback if ^VIX3M returns empty.
+    """
+    vix = fetch_series("^VIX", start=start, period=period)
+
+    # Primary Yahoo ticker is ^VIX3M; some environments may fail.
+    # If it fails, we raise a clear error (you could adapt this to another vendor).
+    try:
+        vix3m = fetch_series("^VIX3M", start=start, period=period)
+    except Exception as e:
+        raise RuntimeError(
+            "Failed to fetch ^VIX3M from Yahoo Finance via yfinance.\n"
+            "Confirm the ticker works in your region/platform (Yahoo sometimes varies),\n"
+            "or substitute another data provider.\n"
+            f"Original error: {e}"
+        )
+
+    return vix, vix3m
+
+
+def compute_indicator(
+    vix: pd.Series,
+    vix3m: pd.Series,
+    zwin: int = 252,
+) -> pd.DataFrame:
+    """
+    Align the series, compute slope = VIX3M - VIX and rolling z-score.
+    """
+    df = pd.concat([vix, vix3m], axis=1).dropna()
+    df = df.rename(columns={"^VIX": "VIX", "^VIX3M": "VIX3M"})
+    df["Slope"] = df["VIX3M"] - df["VIX"]
+
+    # Rolling z-score for slope
+    roll_mean = df["Slope"].rolling(zwin).mean()
+    roll_std = df["Slope"].rolling(zwin).std(ddof=0)
+    df["Slope_Z"] = (df["Slope"] - roll_mean) / roll_std
+
+    return df
+
+
+def plot_df(df: pd.DataFrame, tail: int = 500) -> None:
+    """
+    Plot VIX, VIX3M, and slope + z-score (two figures, default matplotlib styling).
+    """
+    plot_df = df.tail(tail)
+
+    # Figure 1: VIX and VIX3M
+    plt.figure()
+    plt.plot(plot_df.index, plot_df["VIX"], label="VIX")
+    plt.plot(plot_df.index, plot_df["VIX3M"], label="VIX3M")
+    plt.title("VIX vs VIX3M (Daily Close)")
+    plt.xlabel("Date")
+    plt.ylabel("Index level")
+    plt.legend()
+    plt.tight_layout()
+
+    # Figure 2: Slope and z-score
+    plt.figure()
+    plt.plot(plot_df.index, plot_df["Slope"], label="Slope (VIX3M - VIX)")
+    plt.plot(plot_df.index, plot_df["Slope_Z"], label="Slope z-score")
+    plt.title("VIX Term Structure Slope and Rolling Z-Score")
+    plt.xlabel("Date")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.tight_layout()
+
+    plt.show()
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Fetch and display VIX term structure slope (VIX3M - VIX).")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD (overrides --period).")
+    g.add_argument("--period", type=str, default="5y", help="Yahoo period string (e.g., 1y, 5y, 10y).")
+
+    p.add_argument("--zwin", type=int, default=252, help="Rolling window length for z-score (trading days).")
+    p.add_argument("--tail", type=int, default=25, help="Rows to print at the end.")
+    p.add_argument("--plot_tail", type=int, default=500, help="How many recent rows to plot.")
+    p.add_argument("--no_plot", action="store_true", help="Do not show plots.")
+    return p.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+
+    # Basic validation of start date format if provided
+    if args.start:
+        try:
+            datetime.strptime(args.start, "%Y-%m-%d")
+        except ValueError:
+            print("ERROR: --start must be in YYYY-MM-DD format.", file=sys.stderr)
+            return 2
+
+    try:
+        vix, vix3m = fetch_vix_and_vix3m(start=args.start, period=args.period)
+        df = compute_indicator(vix, vix3m, zwin=args.zwin)
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+    # Print latest snapshot
+    out = df[["VIX", "VIX3M", "Slope", "Slope_Z"]].copy()
+    print("\nLatest rows:")
+    print(out.tail(args.tail).to_string(float_format=lambda x: f"{x:0.3f}"))
+
+    latest = out.iloc[-1]
+    print("\nLatest reading:")
+    print(f"  Date:     {out.index[-1].date()}")
+    print(f"  VIX:      {latest['VIX']:.3f}")
+    print(f"  VIX3M:    {latest['VIX3M']:.3f}")
+    print(f"  Slope:    {latest['Slope']:.3f}  (VIX3M - VIX)")
+    print(f"  Z-score:  {latest['Slope_Z']:.3f}  (rolling window {args.zwin})")
+
+    if not args.no_plot:
+        plot_df(df, tail=args.plot_tail)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+Notes:
+
+* Install dependencies once: `pip install yfinance pandas matplotlib`
+* If `^VIX3M` fails on your machine (Yahoo occasionally varies by region/platform), the script will raise a clear error; the quickest workaround is to swap in another provider (e.g., direct CBOE historical download or a paid feed) while keeping the same computation section.
