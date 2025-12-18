@@ -5,8 +5,8 @@ import { fetchVixData, fetchLatestVix } from "./lib/vix-fetcher";
 import { fetchHySpreadData } from "./lib/hy-spread-fetcher";
 import NodeCache from "node-cache";
 
-// Cache data for 5 minutes (300 seconds)
-const cache = new NodeCache({ stdTTL: 300 });
+// Cache data for 12 hours (43200 seconds) - data only updates daily
+const cache = new NodeCache({ stdTTL: 43200 });
 
 export async function registerRoutes(
   httpServer: Server,

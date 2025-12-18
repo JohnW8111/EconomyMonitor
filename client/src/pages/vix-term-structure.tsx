@@ -34,9 +34,9 @@ export default function VixTermStructure() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['vix-history', period],
     queryFn: () => fetchVixHistory(period),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
-    retry: false, // Don't retry on error (likely missing API key)
+    staleTime: 12 * 60 * 60 * 1000, // 12 hours - data updates daily
+    refetchInterval: false, // No auto-refresh, data is cached server-side
+    retry: false,
   });
 
   if (isLoading) {

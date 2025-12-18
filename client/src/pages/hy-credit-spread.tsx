@@ -35,8 +35,8 @@ export default function HyCreditSpread() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['hy-spread-history', period],
     queryFn: () => fetchHySpreadHistory(period),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 12 * 60 * 60 * 1000, // 12 hours - data updates daily
+    refetchInterval: false, // No auto-refresh, data is cached server-side
     retry: false,
   });
 
