@@ -1,11 +1,13 @@
-import { MOCK_DATA } from "@/lib/mockData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, ComposedChart, Bar } from "recharts";
-import { AlertCircle, ArrowDown, ArrowUp, Info } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Info, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { fetchVixHistory } from "@/lib/api";
 
 // Custom tooltip for charts
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -27,7 +29,55 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function VixTermStructure() {
-  const [data] = useState(MOCK_DATA);
+  const [period, setPeriod] = useState('2y');
+  
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ['vix-history', period],
+    queryFn: () => fetchVixHistory(period),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading VIX data from Yahoo Finance...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Card className="max-w-md border-destructive/50">
+          <CardHeader>
+            <CardTitle className="text-destructive">Error Loading Data</CardTitle>
+            <CardDescription>
+              {error instanceof Error ? error.message : 'Failed to fetch VIX data'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => refetch()} variant="outline" className="w-full" data-testid="button-retry">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">No data available</p>
+      </div>
+    );
+  }
+
   const latest = data[data.length - 1];
   const previous = data[data.length - 2];
   
@@ -45,14 +95,38 @@ export default function VixTermStructure() {
           <p className="text-muted-foreground mt-1">VIX (Spot) vs VIX3M (3-Month Implied Volatility)</p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={isBackwardation ? "destructive" : "outline"} className="px-3 py-1 text-sm font-medium uppercase tracking-wide">
                 {isBackwardation ? "Backwardation (Stress)" : "Contango (Normal)"}
             </Badge>
             <Badge variant={isStress ? "destructive" : "secondary"} className="px-3 py-1 text-sm font-medium uppercase tracking-wide">
                 Z-Score: {latest.slopeZScore.toFixed(2)}
             </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            </Button>
         </div>
+      </div>
+
+      {/* Period Selector */}
+      <div className="flex gap-2">
+        {['1y', '2y', '5y'].map(p => (
+          <Button 
+            key={p}
+            variant={period === p ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPeriod(p)}
+            data-testid={`button-period-${p}`}
+          >
+            {p.toUpperCase()}
+          </Button>
+        ))}
       </div>
 
       {/* KPI Cards */}
@@ -60,7 +134,7 @@ export default function VixTermStructure() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Spot VIX</CardDescription>
-            <CardTitle className="text-2xl font-mono-nums">{latest.vix.toFixed(2)}</CardTitle>
+            <CardTitle className="text-2xl font-mono-nums" data-testid="text-vix">{latest.vix.toFixed(2)}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xs text-muted-foreground">1-Month Implied Volatility</div>
@@ -70,7 +144,7 @@ export default function VixTermStructure() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>VIX3M</CardDescription>
-            <CardTitle className="text-2xl font-mono-nums">{latest.vix3m.toFixed(2)}</CardTitle>
+            <CardTitle className="text-2xl font-mono-nums" data-testid="text-vix3m">{latest.vix3m.toFixed(2)}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xs text-muted-foreground">3-Month Implied Volatility</div>
@@ -81,10 +155,10 @@ export default function VixTermStructure() {
           <CardHeader className="pb-2">
             <CardDescription>Term Structure Slope</CardDescription>
             <div className="flex items-end gap-2">
-                <CardTitle className={cn("text-2xl font-mono-nums", isBackwardation ? "text-destructive" : "text-emerald-500")}>
+                <CardTitle className={cn("text-2xl font-mono-nums", isBackwardation ? "text-destructive" : "text-emerald-500")} data-testid="text-slope">
                     {latest.slope.toFixed(2)}
                 </CardTitle>
-                <span className={cn("text-xs mb-1 font-mono", slopeChange >= 0 ? "text-emerald-500" : "text-destructive")}>
+                <span className={cn("text-xs mb-1 font-mono", slopeChange >= 0 ? "text-emerald-500" : "text-destructive")} data-testid="text-slope-change">
                     {slopeChange > 0 ? "+" : ""}{slopeChange.toFixed(2)}
                 </span>
             </div>
@@ -97,7 +171,7 @@ export default function VixTermStructure() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Slope Z-Score (1Y)</CardDescription>
-            <CardTitle className={cn("text-2xl font-mono-nums", latest.slopeZScore < -1.5 ? "text-amber-500" : "")}>
+            <CardTitle className={cn("text-2xl font-mono-nums", latest.slopeZScore < -1.5 ? "text-amber-500" : "")} data-testid="text-zscore">
                 {latest.slopeZScore.toFixed(2)}σ
             </CardTitle>
           </CardHeader>
@@ -231,6 +305,9 @@ export default function VixTermStructure() {
                         Normally, longer-term volatility is higher than short-term (Contango), reflecting the uncertainty of time. 
                         When spot VIX spikes above VIX3M (Backwardation), it indicates acute near-term fear and stress in the market. 
                         This indicator tracks that slope and its statistical significance (Z-Score) to flag potential crisis events.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                        Data refreshes every 5 minutes • Source: Yahoo Finance (CBOE VIX Indices)
                     </p>
                 </div>
             </div>

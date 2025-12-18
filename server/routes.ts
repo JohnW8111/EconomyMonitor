@@ -1,16 +1,69 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { fetchVixData, fetchLatestVix } from "./lib/vix-fetcher";
+import NodeCache from "node-cache";
+
+// Cache VIX data for 5 minutes (300 seconds)
+const cache = new NodeCache({ stdTTL: 300 });
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Get VIX term structure data
+  app.get("/api/vix/history", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2y';
+      const cacheKey = `vix-history-${period}`;
+      
+      // Check cache first
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+      // Fetch fresh data
+      const data = await fetchVixData(period);
+      
+      // Cache the result
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/vix/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch VIX data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get latest VIX quote
+  app.get("/api/vix/latest", async (req, res) => {
+    try {
+      const cacheKey = 'vix-latest';
+      
+      // Check cache first (1 minute TTL for latest data)
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchLatestVix();
+      
+      // Cache with shorter TTL
+      cache.set(cacheKey, data, 60);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/vix/latest:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch latest VIX data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
 
   return httpServer;
 }

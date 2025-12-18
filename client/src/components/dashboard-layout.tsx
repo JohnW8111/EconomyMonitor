@@ -34,9 +34,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <nav className="space-y-1 px-2">
           {INDICATORS.map((indicator) => {
             const isActive = location === (indicator.id === "vix" ? "/" : `/indicator/${indicator.id}`);
+            const href = indicator.id === "vix" ? "/" : `/indicator/${indicator.id}`;
+            
             return (
-              <Link key={indicator.id} href={indicator.id === "vix" ? "/" : `/indicator/${indicator.id}`}>
-                <a className={cn(
+              <Link key={indicator.id} href={href}>
+                <div className={cn(
                   "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
                   isActive 
                     ? "bg-sidebar-accent text-sidebar-accent-foreground" 
@@ -50,7 +52,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       SOON
                     </span>
                   )}
-                </a>
+                </div>
               </Link>
             );
           })}
@@ -59,8 +61,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <div className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-muted-foreground">
-            Data Source: Mock Generated <br/>
-            (Based on CBOE Methodology)
+            Data Source: Yahoo Finance <br/>
+            (CBOE VIX Methodology)
         </div>
       </div>
     </div>
