@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { fetchVixData, fetchLatestVix } from "./lib/vix-fetcher";
 import { fetchHySpreadData } from "./lib/hy-spread-fetcher";
 import { fetchHyIgRatioData } from "./lib/hy-ig-ratio-fetcher";
+import { fetchTedSpreadData } from "./lib/ted-spread-fetcher";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
