@@ -304,12 +304,12 @@ export default function VixTermStructure() {
         <Card>
             <CardHeader>
                 <CardTitle>Slope Z-Score (Rolling 1-Year)</CardTitle>
-                <CardDescription>Standard deviations from the mean</CardDescription>
+                <CardDescription>Standard deviations from the mean (requires 252 trading days of history)</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChartWrapper data={data} />
+                        <BarChartWrapper data={data.filter((d, i) => i >= 251)} />
                     </ResponsiveContainer>
                 </div>
             </CardContent>
