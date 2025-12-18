@@ -107,6 +107,9 @@ export default function VixTermStructure() {
   // Calculate change
   const slopeChange = latest.slope - previous.slope;
 
+  // Filter to only show data points where Z-score is calculated (non-zero or after enough history)
+  const zScoreData = data.filter((d: any) => d.slopeZScore !== 0 || data.indexOf(d) >= 251);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -304,13 +307,19 @@ export default function VixTermStructure() {
         <Card>
             <CardHeader>
                 <CardTitle>Slope Z-Score (Rolling 1-Year)</CardTitle>
-                <CardDescription>Standard deviations from the mean (requires 252 trading days of history)</CardDescription>
+                <CardDescription>Standard deviations from the mean (showing last {zScoreData.length} days with calculated Z-scores)</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChartWrapper data={data.filter((d, i) => i >= 251)} />
-                    </ResponsiveContainer>
+                    {zScoreData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                          <BarChartWrapper data={zScoreData} />
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Need 252+ trading days of history to calculate Z-scores
+                      </div>
+                    )}
                 </div>
             </CardContent>
         </Card>
