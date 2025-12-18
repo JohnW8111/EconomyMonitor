@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { fetchVixData, fetchLatestVix } from "./lib/vix-fetcher";
+import { fetchHySpreadData } from "./lib/hy-spread-fetcher";
 import NodeCache from "node-cache";
 
-// Cache VIX data for 5 minutes (300 seconds)
+// Cache data for 5 minutes (300 seconds)
 const cache = new NodeCache({ stdTTL: 300 });
 
 export async function registerRoutes(
@@ -60,6 +61,30 @@ export async function registerRoutes(
       console.error('Error in /api/vix/latest:', error);
       res.status(500).json({ 
         error: 'Failed to fetch latest VIX data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get High Yield Credit Spread data
+  app.get("/api/hy-spread/history", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2y';
+      const cacheKey = `hy-spread-history-${period}`;
+      
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchHySpreadData(period);
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/hy-spread/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch High Yield Spread data',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
     }

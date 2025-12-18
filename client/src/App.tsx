@@ -6,12 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/dashboard-layout";
 import VixTermStructure from "@/pages/vix-term-structure";
+import HyCreditSpread from "@/pages/hy-credit-spread";
 
 function Router() {
   return (
     <Layout>
       <Switch>
         <Route path="/" component={VixTermStructure} />
+        <Route path="/hy-spread" component={HyCreditSpread} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>

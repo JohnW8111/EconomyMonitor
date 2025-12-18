@@ -1,17 +1,23 @@
 import { Link, useLocation } from "wouter";
-import { INDICATORS } from "@/lib/mockData";
 import { 
-  LayoutDashboard, 
   TrendingUp, 
   Activity, 
-  AlertTriangle,
   Menu,
-  ShieldAlert
+  ShieldAlert,
+  DollarSign
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+
+const RISK_INDICATORS = [
+  { id: "vix", name: "VIX Term Structure", href: "/", icon: Activity, active: true },
+  { id: "hy-spread", name: "HY Credit Spread", href: "/hy-spread", icon: DollarSign, active: true },
+  { id: "move", name: "Rates Volatility", href: "/move", icon: TrendingUp, active: false },
+  { id: "yield-curve", name: "Yield Curve", href: "/yield-curve", icon: TrendingUp, active: false },
+  { id: "ted-spread", name: "TED Spread", href: "/ted-spread", icon: TrendingUp, active: false },
+];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -32,12 +38,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           Risk Indicators
         </div>
         <nav className="space-y-1 px-2">
-          {INDICATORS.map((indicator) => {
-            const isActive = location === (indicator.id === "vix" ? "/" : `/indicator/${indicator.id}`);
-            const href = indicator.id === "vix" ? "/" : `/indicator/${indicator.id}`;
+          {RISK_INDICATORS.map((indicator) => {
+            const isActive = location === indicator.href;
+            const Icon = indicator.icon;
             
             return (
-              <Link key={indicator.id} href={href}>
+              <Link key={indicator.id} href={indicator.active ? indicator.href : "#"}>
                 <div className={cn(
                   "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
                   isActive 
@@ -45,7 +51,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
                   !indicator.active && "opacity-60 cursor-not-allowed"
                 )}>
-                  {indicator.id === "vix" ? <Activity className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                  <Icon className="h-4 w-4" />
                   {indicator.name}
                   {!indicator.active && (
                     <span className="ml-auto text-[10px] bg-sidebar-border px-1.5 py-0.5 rounded text-muted-foreground">
@@ -61,8 +67,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <div className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-muted-foreground">
-            Data Source: Yahoo Finance <br/>
-            (CBOE VIX Methodology)
+            Data Source: FRED API <br/>
+            (Federal Reserve Economic Data)
         </div>
       </div>
     </div>
