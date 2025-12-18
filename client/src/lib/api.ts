@@ -29,3 +29,19 @@ export async function fetchHySpreadHistory(period: string = '2y'): Promise<HySpr
   }
   return response.json();
 }
+
+export interface HyIgRatioDataPoint {
+  date: string;
+  hySpread: number;
+  igSpread: number;
+  ratio: number;
+  ratioZScore: number;
+}
+
+export async function fetchHyIgRatioHistory(period: string = '2y'): Promise<HyIgRatioDataPoint[]> {
+  const response = await fetch(`/api/hy-ig-ratio/history?period=${period}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch HY/IG Ratio history');
+  }
+  return response.json();
+}
