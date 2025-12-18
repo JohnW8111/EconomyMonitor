@@ -9,6 +9,7 @@ import VixTermStructure from "@/pages/vix-term-structure";
 import HyCreditSpread from "@/pages/hy-credit-spread";
 import HyIgRatio from "@/pages/hy-ig-ratio";
 import SofrSpread from "@/pages/sofr-spread";
+import JnkPremium from "@/pages/jnk-premium";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
         <Route path="/hy-spread" component={HyCreditSpread} />
         <Route path="/hy-ig-ratio" component={HyIgRatio} />
         <Route path="/sofr-spread" component={SofrSpread} />
+        <Route path="/jnk-premium" component={JnkPremium} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>

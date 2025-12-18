@@ -61,3 +61,18 @@ export async function fetchSofrSpreadHistory(period: string = '2y'): Promise<Sof
   }
   return response.json();
 }
+
+export interface JnkPremiumDataPoint {
+  date: string;
+  nav: number;
+  premium: number;
+  premiumZScore: number;
+}
+
+export async function fetchJnkPremiumHistory(period: string = '2y'): Promise<JnkPremiumDataPoint[]> {
+  const response = await fetch(`/api/jnk-premium/history?period=${period}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch JNK Premium history');
+  }
+  return response.json();
+}

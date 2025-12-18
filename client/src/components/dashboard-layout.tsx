@@ -16,6 +16,7 @@ const RISK_INDICATORS = [
   { id: "hy-spread", name: "HY Credit Spread", href: "/hy-spread", icon: DollarSign, active: true },
   { id: "hy-ig-ratio", name: "HY/IG Spread Ratio", href: "/hy-ig-ratio", icon: TrendingUp, active: true },
   { id: "sofr-spread", name: "Funding Stress", href: "/sofr-spread", icon: TrendingUp, active: true },
+  { id: "jnk-premium", name: "HY ETF Discount/Premium", href: "/jnk-premium", icon: DollarSign, active: true },
   { id: "move", name: "Rates Volatility", href: "/move", icon: TrendingUp, active: false },
   { id: "yield-curve", name: "Yield Curve", href: "/yield-curve", icon: TrendingUp, active: false },
 ];
@@ -68,8 +69,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <div className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-muted-foreground">
-            Data Source: FRED API <br/>
-            (Federal Reserve Economic Data)
+            Data Sources: FRED, State Street
         </div>
       </div>
     </div>
