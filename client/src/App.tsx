@@ -8,6 +8,7 @@ import Layout from "@/components/dashboard-layout";
 import VixTermStructure from "@/pages/vix-term-structure";
 import HyCreditSpread from "@/pages/hy-credit-spread";
 import HyIgRatio from "@/pages/hy-ig-ratio";
+import SofrSpread from "@/pages/sofr-spread";
 
 function Router() {
   return (
@@ -16,6 +17,7 @@ function Router() {
         <Route path="/" component={VixTermStructure} />
         <Route path="/hy-spread" component={HyCreditSpread} />
         <Route path="/hy-ig-ratio" component={HyIgRatio} />
+        <Route path="/sofr-spread" component={SofrSpread} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>

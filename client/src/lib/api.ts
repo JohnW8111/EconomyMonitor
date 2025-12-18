@@ -45,3 +45,19 @@ export async function fetchHyIgRatioHistory(period: string = '2y'): Promise<HyIg
   }
   return response.json();
 }
+
+export interface SofrSpreadDataPoint {
+  date: string;
+  sofr90: number;
+  tbill3m: number;
+  spread: number;
+  spreadZScore: number;
+}
+
+export async function fetchSofrSpreadHistory(period: string = '2y'): Promise<SofrSpreadDataPoint[]> {
+  const response = await fetch(`/api/sofr-spread/history?period=${period}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch SOFR Spread history');
+  }
+  return response.json();
+}

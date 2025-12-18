@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { fetchVixData, fetchLatestVix } from "./lib/vix-fetcher";
 import { fetchHySpreadData } from "./lib/hy-spread-fetcher";
 import { fetchHyIgRatioData } from "./lib/hy-ig-ratio-fetcher";
+import { fetchSofrSpreadData } from "./lib/sofr-spread-fetcher";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
@@ -110,6 +111,30 @@ export async function registerRoutes(
       console.error('Error in /api/hy-ig-ratio/history:', error);
       res.status(500).json({ 
         error: 'Failed to fetch HY/IG Ratio data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get SOFR-Treasury Spread (Funding Stress) data
+  app.get("/api/sofr-spread/history", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2y';
+      const cacheKey = `sofr-spread-history-${period}`;
+      
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchSofrSpreadData(period);
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/sofr-spread/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch SOFR Spread data',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
     }

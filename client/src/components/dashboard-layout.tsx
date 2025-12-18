@@ -15,6 +15,7 @@ const RISK_INDICATORS = [
   { id: "vix", name: "VIX Term Structure", href: "/", icon: Activity, active: true },
   { id: "hy-spread", name: "HY Credit Spread", href: "/hy-spread", icon: DollarSign, active: true },
   { id: "hy-ig-ratio", name: "HY/IG Spread Ratio", href: "/hy-ig-ratio", icon: TrendingUp, active: true },
+  { id: "sofr-spread", name: "Funding Stress", href: "/sofr-spread", icon: TrendingUp, active: true },
   { id: "move", name: "Rates Volatility", href: "/move", icon: TrendingUp, active: false },
   { id: "yield-curve", name: "Yield Curve", href: "/yield-curve", icon: TrendingUp, active: false },
 ];
