@@ -314,12 +314,7 @@ export default function JnkPremium() {
             <div className="space-y-2">
               <h3 className="font-semibold text-foreground">Why this matters</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When a high-yield bond ETF trades at a persistent discount to its NAV, it signals liquidity stress 
-                in the underlying bond market. The ETF can be traded easily on exchanges, but the underlying 
-                junk bonds may be difficult to buy/sell. During market stress, authorized participants cannot 
-                efficiently arbitrage the gap, causing discounts to widen. A discount beyond -1% often indicates 
-                elevated credit market stress. Spikes in discounts have historically coincided with credit crises 
-                and flight-to-quality episodes.
+                Persistent discount (ETF trading below NAV) indicates liquidity stress: underlying bonds are harder to trade than the ETF.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 Data updates daily (EOD) • Source: State Street SPDR • Ticker: JNK
