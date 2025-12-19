@@ -368,7 +368,7 @@ export default function ErpProxy() {
                 When ERP Proxy is compressed (low/negative z-score), equities are "priced for perfection." Shocks from credit, liquidity, or macro events are more likely to cause outsized drawdowns.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Data updates daily (EOD) • Sources: FRED (SP500, DFII10), Multpl (TTM EPS)
+                Data updates daily (EOD) • This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. • Multpl (TTM EPS)
               </p>
             </div>
           </div>
