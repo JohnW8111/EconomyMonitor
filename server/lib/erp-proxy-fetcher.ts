@@ -69,21 +69,21 @@ async function fetchMultplEps(): Promise<Map<string, number>> {
   for (const rowMatch of rowMatches) {
     const row = rowMatch[0];
     const cellMatches = Array.from(row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi));
-    const cells = cellMatches.map(m => m[1].replace(/<[^>]*>/g, '').trim());
+    const cells = cellMatches.map(m => m[1].replace(/<[^>]*>/g, '').replace(/&#x[0-9a-fA-F]+;/g, '').trim());
     
     if (cells.length >= 2) {
-      const dateStr = cells[0];
-      const valueStr = cells[1];
+      const dateStr = cells[0].trim();
+      const valueStr = cells[1].trim();
       
-      const dateMatch = dateStr.match(/([A-Za-z]{3})\s+\d{1,2},?\s+(\d{4})/);
+      const dateMatch = dateStr.match(/([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})/);
       if (dateMatch) {
         const month = monthMap[dateMatch[1]];
-        const year = dateMatch[2];
+        const year = dateMatch[3];
         if (month && year) {
           const lastDayOfMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
           const formattedDate = `${year}-${month}-${String(lastDayOfMonth).padStart(2, '0')}`;
           
-          const cleanValue = valueStr.replace(/[,$\s]/g, '');
+          const cleanValue = valueStr.replace(/[,$\s\n]/g, '');
           const value = parseFloat(cleanValue);
           if (!isNaN(value) && value > 0) {
             result.set(formattedDate, value);
