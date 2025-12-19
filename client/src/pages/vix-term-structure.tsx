@@ -355,10 +355,7 @@ export default function VixTermStructure() {
                 <div className="space-y-2">
                     <h3 className="font-semibold text-foreground">Why this matters</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                        The VIX Term Structure measures the difference between 3-month implied volatility (VIX3M) and 1-month implied volatility (VIX). 
-                        Normally, longer-term volatility is higher than short-term (Contango), reflecting the uncertainty of time. 
-                        When spot VIX spikes above VIX3M (Backwardation), it indicates acute near-term fear and stress in the market. 
-                        This indicator tracks that slope and its statistical significance (Z-Score) to flag potential crisis events.
+                        When front-month volatility spikes above 3M (backwardation), it's often a sign of acute stress.
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
                         Data updates daily (EOD) • Source: Federal Reserve Economic Data (FRED)
