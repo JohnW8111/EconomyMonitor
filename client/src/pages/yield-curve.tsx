@@ -322,7 +322,7 @@ export default function YieldCurve() {
                 An inverted yield curve (negative slope) has historically preceded recessions. When short-term rates exceed long-term rates, it signals expectations of economic slowdown.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Data updates daily (EOD) • Source: Federal Reserve Economic Data (FRED)
+                Data updates daily (EOD) • This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.
               </p>
             </div>
           </div>

@@ -358,7 +358,7 @@ export default function VixTermStructure() {
                         When front-month volatility spikes above 3M (backwardation), it's often a sign of acute stress.
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                        Data updates daily (EOD) • Source: Federal Reserve Economic Data (FRED)
+                        Data updates daily (EOD) • This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.
                     </p>
                 </div>
             </div>

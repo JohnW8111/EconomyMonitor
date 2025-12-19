@@ -343,7 +343,7 @@ export default function SofrSpread() {
                 have coincided with financial crises and market stress events.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Data updates daily (EOD) • Source: Federal Reserve Economic Data (FRED) • Series: SOFR90DAYAVG, DTB3
+                Data updates daily (EOD) • This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. • Series: SOFR90DAYAVG, DTB3
               </p>
             </div>
           </div>

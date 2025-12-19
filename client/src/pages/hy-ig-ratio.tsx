@@ -339,7 +339,7 @@ export default function HyIgRatio() {
                 and can be a leading indicator of broader market stress.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Data updates daily (EOD) • Source: Federal Reserve Economic Data (FRED) • Series: BAMLH0A0HYM2 / BAMLC0A0CM
+                Data updates daily (EOD) • This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. • Series: BAMLH0A0HYM2 / BAMLC0A0CM
               </p>
             </div>
           </div>
