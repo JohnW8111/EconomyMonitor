@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { subYears, format, parseISO, isValid } from "date-fns";
+import { subYears, format, parse, isValid } from "date-fns";
 
 export interface JnkPremiumDataPoint {
   date: string;
@@ -31,22 +31,39 @@ function parseExcelDate(value: any): string | null {
   if (!value) return null;
   
   if (typeof value === 'number') {
-    const date = XLSX.SSF.parse_date_code(value);
-    if (date) {
-      return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+    const jsDate = XLSX.SSF.parse_date_code(value);
+    if (jsDate) {
+      const year = jsDate.y;
+      const month = String(jsDate.m).padStart(2, '0');
+      const day = String(jsDate.d).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
   }
   
   if (typeof value === 'string') {
-    const parsed = parseISO(value);
-    if (isValid(parsed)) {
-      return format(parsed, 'yyyy-MM-dd');
+    const formats = [
+      'dd-MMM-yy',
+      'dd-MMM-yyyy',
+      'MMM dd, yyyy',
+      'MM/dd/yyyy',
+      'M/d/yyyy',
+      'yyyy-MM-dd'
+    ];
+    
+    for (const fmt of formats) {
+      try {
+        const parsed = parse(value, fmt, new Date());
+        if (isValid(parsed)) {
+          return format(parsed, 'yyyy-MM-dd');
+        }
+      } catch {}
     }
-    const parts = value.split(/[\/\-]/);
-    if (parts.length === 3) {
-      const [m, d, y] = parts;
+    
+    const dateMatch = value.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (dateMatch) {
+      const [_, m, d, y] = dateMatch;
       const year = y.length === 2 ? `20${y}` : y;
-      return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
   }
   
@@ -59,13 +76,13 @@ export async function fetchJnkPremiumData(period: string = '2y'): Promise<JnkPre
     fetchExcelData(NAVHIST_URL)
   ]);
 
-  const pdWorkbook = XLSX.read(pdBuffer, { type: 'array' });
+  const pdWorkbook = XLSX.read(pdBuffer, { type: 'array', cellDates: true });
   const pdSheet = pdWorkbook.Sheets[pdWorkbook.SheetNames[0]];
-  const pdData: any[] = XLSX.utils.sheet_to_json(pdSheet, { header: 1 });
+  const pdData: any[] = XLSX.utils.sheet_to_json(pdSheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
 
-  const navWorkbook = XLSX.read(navBuffer, { type: 'array' });
+  const navWorkbook = XLSX.read(navBuffer, { type: 'array', cellDates: true });
   const navSheet = navWorkbook.Sheets[navWorkbook.SheetNames[0]];
-  const navData: any[] = XLSX.utils.sheet_to_json(navSheet, { header: 1 });
+  const navData: any[] = XLSX.utils.sheet_to_json(navSheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
 
   const navMap = new Map<string, number>();
   for (let i = 1; i < navData.length; i++) {
