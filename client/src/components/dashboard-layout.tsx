@@ -17,7 +17,7 @@ const RISK_INDICATORS = [
   { id: "hy-ig-ratio", name: "(Credit) HY/IG Spread Ratio", href: "/hy-ig-ratio", icon: TrendingUp, active: true },
   { id: "sofr-spread", name: "(Funding & Liquidity) Funding Stress", href: "/sofr-spread", icon: TrendingUp, active: true },
   { id: "jnk-premium", name: "(Funding & Liquidity) HY ETF Discount/Premium", href: "/jnk-premium", icon: DollarSign, active: true },
-  { id: "yield-curve", name: "Yield Curve Slope", href: "/yield-curve", icon: TrendingUp, active: true },
+  { id: "yield-curve", name: "(Macro/Curve) Yield Curve Slope", href: "/yield-curve", icon: TrendingUp, active: true },
   { id: "move", name: "Rates Volatility", href: "/move", icon: TrendingUp, active: false },
 ];
 
