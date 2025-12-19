@@ -50,13 +50,14 @@ async function fetchMultplEps(): Promise<Map<string, number>> {
 
   const html = await response.text();
   
-  const tableMatch = html.match(/<table[^>]*class="[^"]*data-table[^"]*"[^>]*>([\s\S]*?)<\/table>/i);
+  const tableMatch = html.match(/<table[^>]*id="datatable"[^>]*>([\s\S]*?)<\/table>/i) || 
+                     html.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
   if (!tableMatch) {
     throw new Error('Could not find data table on Multpl page');
   }
 
   const tableHtml = tableMatch[0];
-  const rowMatches = Array.from(tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi));
+  const rowMatches = Array.from(tableHtml.matchAll(/<tr[^>]*class="(?:odd|even)"[^>]*>([\s\S]*?)<\/tr>/gi));
   
   const result = new Map<string, number>();
   const monthMap: { [key: string]: string } = {
