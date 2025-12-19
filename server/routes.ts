@@ -6,6 +6,7 @@ import { fetchHySpreadData } from "./lib/hy-spread-fetcher";
 import { fetchHyIgRatioData } from "./lib/hy-ig-ratio-fetcher";
 import { fetchSofrSpreadData } from "./lib/sofr-spread-fetcher";
 import { fetchJnkPremiumData } from "./lib/jnk-premium-fetcher";
+import { fetchYieldCurveData } from "./lib/yield-curve-fetcher";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
@@ -160,6 +161,30 @@ export async function registerRoutes(
       console.error('Error in /api/jnk-premium/history:', error);
       res.status(500).json({ 
         error: 'Failed to fetch JNK Premium data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get Yield Curve Slope data (10Y - 3M)
+  app.get("/api/yield-curve/history", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2y';
+      const cacheKey = `yield-curve-history-${period}`;
+      
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchYieldCurveData(period);
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/yield-curve/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch Yield Curve data',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
     }

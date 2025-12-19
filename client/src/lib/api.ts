@@ -76,3 +76,19 @@ export async function fetchJnkPremiumHistory(period: string = '2y'): Promise<Jnk
   }
   return response.json();
 }
+
+export interface YieldCurveDataPoint {
+  date: string;
+  dgs10: number;
+  dgs3mo: number;
+  slope: number;
+  slopeZScore: number;
+}
+
+export async function fetchYieldCurveHistory(period: string = '2y'): Promise<YieldCurveDataPoint[]> {
+  const response = await fetch(`/api/yield-curve/history?period=${period}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch Yield Curve history');
+  }
+  return response.json();
+}
