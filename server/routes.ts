@@ -7,6 +7,7 @@ import { fetchHyIgRatioData } from "./lib/hy-ig-ratio-fetcher";
 import { fetchSofrSpreadData } from "./lib/sofr-spread-fetcher";
 import { fetchJnkPremiumData } from "./lib/jnk-premium-fetcher";
 import { fetchYieldCurveData } from "./lib/yield-curve-fetcher";
+import { fetchErpProxyData } from "./lib/erp-proxy-fetcher";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
@@ -185,6 +186,30 @@ export async function registerRoutes(
       console.error('Error in /api/yield-curve/history:', error);
       res.status(500).json({ 
         error: 'Failed to fetch Yield Curve data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get Equity Risk Premium Proxy data
+  app.get("/api/erp-proxy/history", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2y';
+      const cacheKey = `erp-proxy-history-${period}`;
+      
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchErpProxyData(period);
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/erp-proxy/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch ERP Proxy data',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
     }

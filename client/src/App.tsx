@@ -11,6 +11,7 @@ import HyIgRatio from "@/pages/hy-ig-ratio";
 import SofrSpread from "@/pages/sofr-spread";
 import JnkPremium from "@/pages/jnk-premium";
 import YieldCurve from "@/pages/yield-curve";
+import ErpProxy from "@/pages/erp-proxy";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/sofr-spread" component={SofrSpread} />
         <Route path="/jnk-premium" component={JnkPremium} />
         <Route path="/yield-curve" component={YieldCurve} />
+        <Route path="/erp-proxy" component={ErpProxy} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>

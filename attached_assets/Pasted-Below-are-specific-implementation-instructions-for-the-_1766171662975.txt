@@ -1,0 +1,325 @@
+Below are **specific implementation instructions** for the Replit agent for this indicator.
+
+## Indicator: Equity Risk Premium Proxy (ERP Proxy)
+
+### Goal
+
+Implement a daily time-series indicator:
+
+**ERP_Proxy(t) = EarningsYield(t) − RealYield10y(t)**
+
+Where:
+
+* **EarningsYield(t) = 100 × (TTM_EPS(t) / SP500_Price(t))**
+* **RealYield10y(t) = DFII10(t)** (10-year TIPS real yield, percent)
+
+### Why we track it
+
+Treat this as a **background fragility / valuation-tightness** gauge:
+
+* When ERP_Proxy becomes **very low / compressed**, equities are more “priced for perfection,” and shocks from credit, liquidity, or macro are more likely to cause outsized drawdowns.
+* This is **not** a timing trigger; it is an **input** that can scale risk alerts (e.g., amplify warnings when other stress indicators also rise).
+
+---
+
+## Data sources (daily automation)
+
+### A) Daily S&P 500 price
+
+* Source: **FRED series `SP500`** (daily close)
+* Pull method: FRED CSV endpoint (no API key required) or FRED API if preferred.
+
+### B) Daily 10-year real yield
+
+* Source: **FRED series `DFII10`** (10-year inflation-indexed Treasury constant maturity, percent)
+* Pull method: same as above.
+
+**Recommended combined pull (fastest):**
+
+* Use the single FRED “fredgraph.csv” endpoint for both:
+
+  * `https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500,DFII10`
+
+---
+
+## Earnings input strategy (critical design decision)
+
+### Key point
+
+You do **not** need “daily earnings data” to chart this daily.
+
+Use:
+
+* Daily price (SP500) and daily real yield (DFII10)
+* A **TTM EPS series updated infrequently** (effectively quarterly), then **forward-fill** it across days
+
+Daily movement in earnings yield comes primarily from **daily price changes**, not daily earnings updates.
+
+### EPS source for MVP
+
+* Source: **Multpl S&P 500 Earnings (TTM EPS) table by month**
+
+  * Use: `https://www.multpl.com/s-p-500-earnings/table/by-month`
+* Treat this as **TTM EPS** displayed monthly.
+* Implementation: parse the HTML table, build a monthly time series, then **reindex to daily** and forward-fill.
+
+**Note:** Even if Multpl shows monthly rows, the underlying “earnings base” updates when new reported earnings roll into the trailing 12 months; between updates, the daily variation is price-driven.
+
+---
+
+## Computation requirements
+
+1. Create a daily dataframe indexed by date with columns:
+
+   * `SP500` (daily close)
+   * `DFII10` (daily percent)
+   * `EPS_TTM` (monthly from Multpl, forward-filled to daily)
+
+2. Compute:
+
+   * `earnings_yield_pct = 100 * EPS_TTM / SP500`
+   * `erp_proxy_pct = earnings_yield_pct - DFII10`
+
+3. Output:
+
+   * Latest reading (date + 3 inputs + 2 computed fields)
+   * A daily chart of `erp_proxy_pct`
+   * (Optional but recommended) rolling z-score for `erp_proxy_pct` (e.g., 252 trading days)
+
+---
+
+## Web app integration requirements (MVP)
+
+### Backend tasks
+
+* Create a scheduled job (daily) to:
+
+  * Pull SP500 + DFII10 from FRED
+  * Pull EPS table from Multpl
+  * Recompute and store the daily series (SQLite/Postgres)
+
+### Frontend display
+
+* Show:
+
+  * Current ERP proxy value
+  * Chart over selectable ranges (1y / 5y / 10y)
+  * “Fragility state” label (example):
+
+    * High fragility if ERP proxy in lowest historical decile or z-score < −1.5
+
+### Reliability / fallbacks
+
+* If Multpl fetch fails:
+
+  * Use last stored EPS_TTM (stale but acceptable for a few days)
+  * Display a “data freshness” warning (last EPS update date)
+
+---
+
+## Implementation constraints / notes
+
+* Normalize units carefully:
+
+  * `DFII10` is already in **percent**
+  * Earnings yield should be computed in **percent** to subtract cleanly
+* Handle missing values:
+
+  * FRED uses `.` or blank for missing; coerce to NaN
+  * Drop rows where SP500 or DFII10 are missing
+* Cache external calls (FRED + Multpl) to avoid rate issues.
+
+These instructions correspond directly to the example Python script: fetch FRED daily series, scrape Multpl monthly EPS, forward-fill to daily, compute and chart `(E/P) − DFII10`.
+
+Here is some example python script. Dont use it. I am showing just to help you
+
+#!/usr/bin/env python3
+"""
+Daily Equity Risk Premium proxy:
+    ERP_proxy(t) = 100 * (TTM_EPS(t) / SP500_close(t))  -  DFII10(t)
+
+Data sources (free):
+- SP500 close and 10y TIPS real yield: FRED CSV endpoint
+  https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500,DFII10
+
+- TTM earnings per share (monthly table): Multpl
+  https://www.multpl.com/s-p-500-earnings/table/by-month
+
+Notes:
+- Multpl “S&P 500 Earnings” is a 12-month (TTM) EPS series shown monthly (inflation-adjusted).
+- For a daily chart, we forward-fill the latest monthly EPS across days; daily movement then comes from price + real yields.
+
+Dependencies:
+  pip install pandas matplotlib requests lxml
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+import argparse
+from datetime import date
+import pandas as pd
+import requests
+import matplotlib.pyplot as plt
+
+
+FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500,DFII10"
+MULTPL_EPS_URL = "https://www.multpl.com/s-p-500-earnings/table/by-month"
+
+
+def fetch_fred_sp500_dfii10() -> pd.DataFrame:
+    """Fetch daily SP500 and DFII10 from FRED CSV endpoint."""
+    df = pd.read_csv(FRED_CSV_URL)
+    df["DATE"] = pd.to_datetime(df["DATE"])
+    df = df.set_index("DATE").sort_index()
+    for c in ["SP500", "DFII10"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    return df
+
+
+def _parse_multpl_table(html: str) -> pd.DataFrame:
+    """
+    Parse the earnings table from Multpl. The page structure may change;
+    this tries to robustly locate a 2-column date/value table.
+    """
+    tables = pd.read_html(html)
+    if not tables:
+        raise ValueError("No tables found on Multpl page.")
+
+    # Pick the first table that looks like (Date, Value)
+    cand = None
+    for t in tables:
+        if t.shape[1] >= 2:
+            col0 = str(t.columns[0]).lower()
+            col1 = str(t.columns[1]).lower()
+            # Either has header-like names or first column looks like dates
+            if "date" in col0 or "value" in col1 or "earn" in col1:
+                cand = t.iloc[:, :2].copy()
+                break
+
+    if cand is None:
+        # Fallback: just take the largest table and first 2 cols
+        cand = max(tables, key=lambda x: x.shape[0]).iloc[:, :2].copy()
+
+    cand.columns = ["Date", "EPS_TTM"]
+    return cand
+
+
+def fetch_multpl_eps_monthly() -> pd.Series:
+    """Fetch the Multpl by-month TTM EPS table and return a monthly Series indexed by month-end."""
+    r = requests.get(MULTPL_EPS_URL, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+
+    df = _parse_multpl_table(r.text)
+
+    # Clean EPS values (remove commas, stray chars)
+    def clean_num(x):
+        if pd.isna(x):
+            return pd.NA
+        s = str(x)
+        s = re.sub(r"[,\s]", "", s)
+        s = re.sub(r"[^0-9.\-]", "", s)
+        return pd.to_numeric(s, errors="coerce")
+
+    df["EPS_TTM"] = df["EPS_TTM"].map(clean_num)
+
+    # Parse dates: Multpl commonly uses "Jun 2025" or "Jun 1, 2025" formats.
+    # We normalize to month-end for consistent joins.
+    d = pd.to_datetime(df["Date"], errors="coerce")
+    if d.isna().all():
+        # Try month-year parsing
+        d = pd.to_datetime(df["Date"].astype(str).str.strip(), format="%b %Y", errors="coerce")
+
+    if d.isna().all():
+        raise ValueError("Could not parse dates from Multpl table (format may have changed).")
+
+    df["Date"] = d
+
+    # Convert to month-end index
+    idx = (df["Date"] + pd.offsets.MonthEnd(0)).dt.normalize()
+    s = pd.Series(df["EPS_TTM"].values, index=idx, name="EPS_TTM").sort_index()
+
+    # Drop missing/duplicates (keep last)
+    s = s[~s.index.duplicated(keep="last")].dropna()
+
+    return s
+
+
+def build_daily_erp_proxy(start: str | None = None) -> pd.DataFrame:
+    """Join daily SP500/DFII10 with monthly EPS (forward-filled) and compute ERP proxy."""
+    fred = fetch_fred_sp500_dfii10()
+    eps_m = fetch_multpl_eps_monthly()
+
+    # Optionally trim the sample
+    if start:
+        fred = fred.loc[pd.to_datetime(start):]
+        eps_m = eps_m.loc[pd.to_datetime(start):]
+
+    # Reindex EPS to daily FRED calendar and forward-fill
+    eps_d = eps_m.reindex(fred.index, method="ffill")
+
+    df = fred.copy()
+    df["EPS_TTM"] = eps_d
+
+    # Compute earnings yield and ERP proxy
+    df["earnings_yield_pct"] = 100.0 * (df["EPS_TTM"] / df["SP500"])
+    df["erp_proxy_pct"] = df["earnings_yield_pct"] - df["DFII10"]
+
+    return df
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Daily ERP proxy = (E/P) - DFII10 using FRED + Multpl EPS.")
+    ap.add_argument("--start", default=None, help="Start date YYYY-MM-DD (optional).")
+    ap.add_argument("--tail", type=int, default=15, help="Rows to print from the end.")
+    ap.add_argument("--years", type=int, default=5, help="How many years to plot from the end.")
+    ap.add_argument("--csv", default=None, help="Optional path to save output CSV.")
+    args = ap.parse_args()
+
+    df = build_daily_erp_proxy(start=args.start)
+
+    # Keep only rows where all inputs exist
+    df2 = df.dropna(subset=["SP500", "DFII10", "EPS_TTM", "erp_proxy_pct"]).copy()
+
+    if df2.empty:
+        raise RuntimeError("No complete rows after joining SP500, DFII10, and EPS_TTM.")
+
+    print("\nLatest rows:")
+    print(df2[["SP500", "DFII10", "EPS_TTM", "earnings_yield_pct", "erp_proxy_pct"]]
+          .tail(args.tail)
+          .to_string(float_format=lambda x: f"{x:0.3f}"))
+
+    last = df2.iloc[-1]
+    print("\nLatest reading:")
+    print(f"  Date:              {df2.index[-1].date()}")
+    print(f"  SP500 (close):      {last['SP500']:.2f}")
+    print(f"  10y real yield %:   {last['DFII10']:.2f}")
+    print(f"  TTM EPS (Multpl):   {last['EPS_TTM']:.2f}")
+    print(f"  Earnings yield %:   {last['earnings_yield_pct']:.2f}")
+    print(f"  ERP proxy %:        {last['erp_proxy_pct']:.2f}")
+
+    if args.csv:
+        df2.to_csv(args.csv, index_label="DATE")
+        print(f"\nSaved: {args.csv}")
+
+    # Plot last N years (approximate)
+    end = df2.index.max()
+    start_plot = end - pd.DateOffset(years=args.years)
+    plot_df = df2.loc[start_plot:end]
+
+    plt.figure()
+    plt.plot(plot_df.index, plot_df["erp_proxy_pct"])
+    plt.title("Equity Risk Premium Proxy (daily): Earnings Yield (%) - 10y TIPS Real Yield (%)")
+    plt.xlabel("Date")
+    plt.ylabel("Percent")
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)

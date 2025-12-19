@@ -92,3 +92,21 @@ export async function fetchYieldCurveHistory(period: string = '2y'): Promise<Yie
   }
   return response.json();
 }
+
+export interface ErpProxyDataPoint {
+  date: string;
+  sp500: number;
+  realYield: number;
+  epsTtm: number;
+  earningsYield: number;
+  erpProxy: number;
+  erpProxyZScore: number;
+}
+
+export async function fetchErpProxyHistory(period: string = '2y'): Promise<ErpProxyDataPoint[]> {
+  const response = await fetch(`/api/erp-proxy/history?period=${period}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch ERP Proxy history');
+  }
+  return response.json();
+}
