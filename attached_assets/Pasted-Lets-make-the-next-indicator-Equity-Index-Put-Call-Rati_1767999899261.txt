@@ -1,0 +1,36 @@
+Lets make the next indicator: Equity Index Put–Call Ratio (Positioning / Hedging Tone) What:
+Put–call volume or open interest ratio for index options (SPX/SPY), not single stocks.
+Why:
+Very low index put–call → complacency / call-chasing.
+Very high levels could either be fear or heavy hedging, depending on context—but extremes are still informative.
+Where:
+CBOE publishes daily put–call ratio data for index options and for total markets.
+Some brokers expose these time series via API or data downloads.
+Implementation note:
+Track index put–call vs its own 5–10y history (z-score).
+Consider also equity-only put–call; divergence between the two can be interesting. Here are data sources For an index put–call ratio (SPX/SPXW preferred), you have three practical “go-to” sources. Two are free directly from Cboe (best starting point); one is paid but API-friendly.
+1) Cboe Daily Market Statistics (free; best for “today”)
+Use Cboe’s Daily Market Statistics page with a date parameter:
+Endpoint pattern (HTML):
+https://www.cboe.com/us/options/market_statistics/daily/?dt=YYYY-MM-DD
+That page publishes (among other fields) the daily:
+INDEX PUT/CALL RATIO
+EQUITY PUT/CALL RATIO
+TOTAL PUT/CALL RATIO
+and, importantly for your “index options, not single stocks” requirement:
+SPX + SPXW PUT/CALL RATIO (S&P 500 index options)
+This is the cleanest free source for a daily pull; your app would scrape the table values for the ratios you want.
+2) Cboe CSV archives (free; best for multi-year history)
+Cboe also hosts downloadable CSV archives on its CDN. These are ideal for building your 5–10y history and z-scores.
+Commonly used files include:
+Equity put/call (equity options aggregate):
+https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv
+Index volume + put/call archive (index options aggregate):
+https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/indexpcarchive.csv
+Put/call ratio archive (total/combined archive):
+https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/pcratioarchive.csv
+(If you also track volatility complex hedging tone) VIX put/call series:
+https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/vixpc.csv
+Cboe indexes these and related files from its “Historical Options Data Download” page.
+Important nuance: the “Index” CSV is aggregate index options, not strictly SPX-only. If you want SPX/SPXW specifically, the daily statistics page explicitly publishes SPX + SPXW put/call.
+Lastly here is some python code to review that might be helpful to you

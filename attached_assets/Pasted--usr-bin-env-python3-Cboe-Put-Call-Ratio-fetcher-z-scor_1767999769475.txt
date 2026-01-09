@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""
+Cboe Put/Call Ratio fetcher + z-score calculator
+
+What this does
+--------------
+1) Downloads multi-year historical put/call ratios from Cboe CSV archives (free):
+   - Index put/call ratio history (aggregate index options): indexpcarchive.csv
+   - Optional: equity and total archives (commented in)
+
+2) Fetches a specific day's "Daily Market Statistics" page from Cboe and extracts:
+   - SPX + SPXW Put/Call Ratio (S&P 500 index options)
+   - INDEX Put/Call Ratio
+   - EQUITY Put/Call Ratio
+   - TOTAL Put/Call Ratio
+
+3) Computes rolling z-scores (default: 252 trading days) for the *historical CSV series*,
+   and reports the most recent z-score.
+
+Notes / caveats
+---------------
+- The Cboe daily stats page is HTML. This script scrapes it with pandas.read_html.
+- The historical CSV for "index" is aggregate index options (not strictly SPX-only).
+  You can store the daily "SPX + SPXW" value separately over time for an SPX-only history.
+- Respect rate limits: do not backfill thousands of HTML pages without permission.
+
+Dependencies
+------------
+pip install pandas requests lxml matplotlib
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Dict, Optional, Tuple
+
+import pandas as pd
+import requests
+
+# Optional plotting
+try:
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
+
+
+# --------------------------
+# Cboe sources
+# --------------------------
+CBOE_DAILY_STATS_URL = "https://www.cboe.com/us/options/market_statistics/daily/?dt={dt}"
+
+CBOE_INDEX_ARCHIVE_CSV = (
+    "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/indexpcarchive.csv"
+)
+
+# Optional additional archives if you want them
+CBOE_EQUITY_PC_CSV = (
+    "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv"
+)
+CBOE_TOTAL_ARCHIVE_CSV = (
+    "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/pcratioarchive.csv"
+)
+
+
+# --------------------------
+# Helpers
+# --------------------------
+def _to_float(x) -> Optional[float]:
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return None
+    s = str(x).strip()
+    s = re.sub(r"[,%\s]", "", s)
+    s = re.sub(r"[^0-9.\-]", "", s)
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+def _pick_date_column(df: pd.DataFrame) -> str:
+    # Common column names
+    for c in df.columns:
+        if str(c).strip().lower() in ("date", "dt", "day"):
+            return c
+    # Fallback: first column
+    return df.columns[0]
+
+
+def _find_ratio_or_compute(df: pd.DataFrame) -> Tuple[pd.Series, str]:
+    """
+    Return a Series of put/call ratio from the downloaded archive.
+
+    Strategy:
+      1) If there is a column with 'ratio' and (put/call or p/c) use it.
+      2) Else compute as PUT_VOLUME / CALL_VOLUME if both exist.
+    """
+    cols = {str(c).strip().lower(): c for c in df.columns}
+
+    # 1) Direct ratio column
+    ratio_candidates = []
+    for lc, orig in cols.items():
+        if "ratio" in lc and ("put" in lc or "p/c" in lc or "pc" in lc or "call" in lc):
+            ratio_candidates.append(orig)
+
+    # also accept generic "p/c ratio"
+    for lc, orig in cols.items():
+        if lc in ("p/c ratio", "put/call ratio", "putcallratio", "put_call_ratio"):
+            ratio_candidates.append(orig)
+
+    if ratio_candidates:
+        col = ratio_candidates[0]
+        s = df[col].map(_to_float)
+        return s, f"direct:{col}"
+
+    # 2) Compute from put & call volumes
+    put_col = None
+    call_col = None
+    for lc, orig in cols.items():
+        if put_col is None and ("put" in lc and "vol" in lc):
+            put_col = orig
+        if call_col is None and ("call" in lc and "vol" in lc):
+            call_col = orig
+
+    # If not found, try looser matching
+    if put_col is None:
+        for lc, orig in cols.items():
+            if "put" in lc and ("volume" in lc or lc.endswith("put")):
+                put_col = orig
+                break
+    if call_col is None:
+        for lc, orig in cols.items():
+            if "call" in lc and ("volume" in lc or lc.endswith("call")):
+                call_col = orig
+                break
+
+    if put_col is not None and call_col is not None:
+        put = df[put_col].map(_to_float)
+        call = df[call_col].map(_to_float)
+        s = put / call
+        return s, f"computed:{put_col}/{call_col}"
+
+    raise ValueError(
+        "Could not find a ratio column, and could not infer put/call volume columns "
+        "to compute the ratio. The CSV schema may have changed."
+    )
+
+
+def _rolling_zscore(s: pd.Series, window: int) -> pd.Series:
+    m = s.rolling(window).mean()
+    sd = s.rolling(window).std(ddof=0)
+    return (s - m) / sd
+
+
+# --------------------------
+# 1) Historical archive fetch
+# --------------------------
+def fetch_cboe_pc_archive(csv_url: str) -> pd.DataFrame:
+    """
+    Fetch a Cboe put/call archive CSV and return a clean DataFrame with:
+      - index: datetime (daily)
+      - column: ratio
+    """
+    r = requests.get(csv_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+
+    df = pd.read_csv(pd.io.common.StringIO(r.text))
+    if df.empty:
+        raise ValueError(f"Empty CSV from {csv_url}")
+
+    date_col = _pick_date_column(df)
+    dt = pd.to_datetime(df[date_col], errors="coerce")
+    if dt.isna().all():
+        raise ValueError(f"Could not parse dates from column {date_col} in {csv_url}")
+
+    ratio, how = _find_ratio_or_compute(df)
+    out = pd.DataFrame({"ratio": ratio.values}, index=dt)
+    out = out[~out.index.isna()].sort_index()
+    out = out.dropna(subset=["ratio"])
+
+    # Deduplicate (keep last)
+    out = out[~out.index.duplicated(keep="last")]
+
+    out.attrs["source_url"] = csv_url
+    out.attrs["ratio_extraction"] = how
+    return out
+
+
+# --------------------------
+# 2) Daily stats page scrape
+# --------------------------
+@dataclass
+class DailyPCRatios:
+    dt: date
+    values: Dict[str, float]  # label -> ratio
+
+
+def fetch_cboe_daily_stats(dt: date) -> DailyPCRatios:
+    """
+    Scrape the Cboe daily stats page for the given date and extract put/call ratios.
+
+    Extracts (if present):
+      - SPX + SPXW Put/Call Ratio
+      - INDEX Put/Call Ratio
+      - EQUITY Put/Call Ratio
+      - TOTAL Put/Call Ratio
+    """
+    url = CBOE_DAILY_STATS_URL.format(dt=dt.isoformat())
+    r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+
+    # Parse all tables
+    tables = pd.read_html(r.text)
+    if not tables:
+        raise ValueError("No tables found on daily stats page. Page layout may have changed.")
+
+    wanted = {
+        "SPX + SPXW PUT/CALL RATIO": "spx_spxw",
+        "INDEX PUT/CALL RATIO": "index",
+        "EQUITY PUT/CALL RATIO": "equity",
+        "TOTAL PUT/CALL RATIO": "total",
+    }
+
+    found: Dict[str, float] = {}
+
+    # Search all tables for two-column rows like (Label, Value)
+    for t in tables:
+        if t.shape[1] < 2:
+            continue
+        # Normalize to first two columns
+        t2 = t.iloc[:, :2].copy()
+        for _, row in t2.iterrows():
+            k = str(row.iloc[0]).strip().upper()
+            v = _to_float(row.iloc[1])
+            if v is None:
+                continue
+            for want_label, key in wanted.items():
+                if want_label in k:
+                    found[key] = v
+
+    if not found:
+        raise ValueError(
+            "Did not find expected put/call ratio rows on the daily stats page. "
+            "Cboe may have changed labels/layout."
+        )
+
+    return DailyPCRatios(dt=dt, values=found)
+
+
+# --------------------------
+# 3) Main: compute z-scores and display
+# --------------------------
+def main():
+    ap = argparse.ArgumentParser(description="Fetch Cboe put/call ratios + compute rolling z-scores.")
+    ap.add_argument("--date", default=None, help="Daily stats date YYYY-MM-DD (default: today).")
+    ap.add_argument("--zwin", type=int, default=252, help="Rolling z-score window (trading days).")
+    ap.add_argument("--plot", action="store_true", help="Plot historical series (requires matplotlib).")
+    ap.add_argument("--save_csv", default=None, help="Optional path to save historical series CSV.")
+    args = ap.parse_args()
+
+    dt = date.today() if args.date is None else datetime.strptime(args.date, "%Y-%m-%d").date()
+
+    # Historical series (for z-score baseline)
+    hist_index = fetch_cboe_pc_archive(CBOE_INDEX_ARCHIVE_CSV)
+    hist_index["z"] = _rolling_zscore(hist_index["ratio"], window=args.zwin)
+
+    # Daily stats scrape (today or specified date)
+    daily = fetch_cboe_daily_stats(dt)
+
+    # Print metadata about how we extracted the ratio from CSV
+    print("\nHistorical source:")
+    print(f"  URL: {hist_index.attrs.get('source_url')}")
+    print(f"  Ratio extraction: {hist_index.attrs.get('ratio_extraction')}")
+    print(f"  Rows: {len(hist_index):,}")
+    print(f"  Date range: {hist_index.index.min().date()} → {hist_index.index.max().date()}")
+
+    # Latest historical reading (for baseline)
+    last_hist = hist_index.iloc[-1]
+    print("\nLatest value in historical INDEX archive (aggregate index options):")
+    print(f"  Date:  {hist_index.index[-1].date()}")
+    print(f"  Ratio: {last_hist['ratio']:.4f}")
+    if pd.notna(last_hist["z"]):
+        print(f"  Z({args.zwin}): {last_hist['z']:.3f}")
+    else:
+        print(f"  Z({args.zwin}): n/a (need at least {args.zwin} observations)")
+
+    # Daily stats values
+    print(f"\nCboe Daily Market Statistics ({dt.isoformat()}):")
+    for k in ("spx_spxw", "index", "equity", "total"):
+        if k in daily.values:
+            print(f"  {k:8s}: {daily.values[k]:.4f}")
+
+    # If the daily date exists in historical index series, report z-score for that date
+    dt_ts = pd.Timestamp(dt)
+    if dt_ts in hist_index.index:
+        z_today = hist_index.loc[dt_ts, "z"]
+        r_today = hist_index.loc[dt_ts, "ratio"]
+        print(f"\nHistorical INDEX archive match for {dt.isoformat()}:")
+        print(f"  Index ratio: {r_today:.4f}")
+        print(f"  Z({args.zwin}): {z_today:.3f}" if pd.notna(z_today) else f"  Z({args.zwin}): n/a")
+    else:
+        print(
+            f"\nNote: {dt.isoformat()} not present in the historical INDEX archive yet "
+            "(archives can lag by a day or more)."
+        )
+
+    # Save optional CSV
+    if args.save_csv:
+        out = hist_index.copy()
+        out.index.name = "DATE"
+        out.to_csv(args.save_csv)
+        print(f"\nSaved historical series to: {args.save_csv}")
+
+    # Optional plot
+    if args.plot:
+        if plt is None:
+            raise RuntimeError("matplotlib not installed. Run: pip install matplotlib")
+        fig = plt.figure()
+        plt.plot(hist_index.index, hist_index["ratio"])
+        plt.title("Cboe Index Put/Call Ratio (archive) — aggregate index options")
+        plt.xlabel("Date")
+        plt.ylabel("Put/Call Ratio")
+        plt.tight_layout()
+
+        fig = plt.figure()
+        plt.plot(hist_index.index, hist_index["z"])
+        plt.title(f"Rolling Z-score of Index Put/Call Ratio (window={args.zwin})")
+        plt.xlabel("Date")
+        plt.ylabel("Z-score")
+        plt.tight_layout()
+        plt.show()
+
+
+if __name__ == "__main__":
+    main()
