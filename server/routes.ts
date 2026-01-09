@@ -220,7 +220,7 @@ export async function registerRoutes(
   app.get("/api/putcall/history", async (req, res) => {
     try {
       const period = (req.query.period as string) || '2y';
-      const cacheKey = `putcall-history-${period}`;
+      const cacheKey = `putcall-history-v2-${period}`;
       
       const cachedData = cache.get(cacheKey);
       if (cachedData) {
