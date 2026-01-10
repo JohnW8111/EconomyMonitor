@@ -17,18 +17,15 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-export const putCallRatios = pgTable("put_call_ratios", {
+export const spxPutCallHistory = pgTable("spx_put_call_history", {
   date: date("date").primaryKey(),
   ratio: real("ratio").notNull(),
-  callVolume: integer("call_volume").notNull(),
-  putVolume: integer("put_volume").notNull(),
-  totalVolume: integer("total_volume").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertPutCallRatioSchema = createInsertSchema(putCallRatios).omit({
+export const insertSpxPutCallSchema = createInsertSchema(spxPutCallHistory).omit({
   createdAt: true,
 });
 
-export type InsertPutCallRatio = z.infer<typeof insertPutCallRatioSchema>;
-export type PutCallRatio = typeof putCallRatios.$inferSelect;
+export type InsertSpxPutCall = z.infer<typeof insertSpxPutCallSchema>;
+export type SpxPutCall = typeof spxPutCallHistory.$inferSelect;

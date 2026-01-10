@@ -1,0 +1,81 @@
+import re
+from datetime import datetime
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+YCHARTS_URL = "https://ycharts.com/indicators/cboe_spx_put_call_ratio"
+UA = "Mozilla/5.0 (compatible; RiskIndicatorBot/1.0; +https://example.com)"
+
+
+def fetch_ycharts_spx_put_call_ratio(url: str = YCHARTS_URL) -> tuple[dict, pd.DataFrame]:
+    """
+    Scrape YCharts SPX Put/Call Ratio page and return:
+      - latest: {"date": date, "value": float}
+      - df: DataFrame with columns ["date", "value"] for the table shown on the page
+
+    Notes:
+      - The "Historical Data" section on the page is not guaranteed to include full history.
+      - If YCharts changes markup, the regex may need adjustment.
+    """
+    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    r.raise_for_status()
+    html = r.text
+
+    # 1) Latest line often appears as: "1.09 for Jan 09 2026"
+    m_latest = re.search(r"(?P<val>\d+(?:\.\d+)?)\s+for\s+(?P<mon>[A-Za-z]{3})\s+(?P<day>\d{2})\s+(?P<yr>\d{4})", html)
+    if not m_latest:
+        raise RuntimeError("Could not find latest 'X for Mon DD YYYY' pattern on the page.")
+
+    val = float(m_latest.group("val"))
+    dt = datetime.strptime(
+        f"{m_latest.group('mon')} {m_latest.group('day')} {m_latest.group('yr')}",
+        "%b %d %Y"
+    ).date()
+    latest = {"date": dt, "value": val}
+
+    # 2) Historical table rows often appear in plaintext as: "January 09, 2026 1.09"
+    rows = []
+    for m in re.finditer(r"(?P<month>[A-Za-z]+)\s+(?P<day>\d{2}),\s+(?P<year>\d{4})\s+(?P<val>\d+(?:\.\d+)?)", html):
+        month = m.group("month")
+        day = m.group("day")
+        year = m.group("year")
+        v = float(m.group("val"))
+        try:
+            d = datetime.strptime(f"{month} {day} {year}", "%B %d %Y").date()
+        except ValueError:
+            # In case YCharts returns abbreviated month names in this section unexpectedly
+            d = datetime.strptime(f"{month} {day} {year}", "%b %d %Y").date()
+
+        rows.append((d, v))
+
+    if not rows:
+        raise RuntimeError("Could not extract any historical rows from the page.")
+
+    df = pd.DataFrame(rows, columns=["date", "value"]).drop_duplicates().sort_values("date").reset_index(drop=True)
+
+    return latest, df
+
+
+def main():
+    latest, df = fetch_ycharts_spx_put_call_ratio()
+    print(f"Latest SPX put/call ratio (volume): {latest['value']:.2f} on {latest['date']:%Y-%m-%d}")
+
+    # Show recent rows
+    print("\nRecent observations:")
+    print(df.tail(10).to_string(index=False))
+
+    # Chart
+    plt.figure()
+    plt.plot(df["date"], df["value"])
+    plt.xticks(rotation=45, ha="right")
+    plt.xlabel("Date")
+    plt.ylabel("SPX Put/Call Ratio (volume)")
+    plt.title("SPX Put/Call Ratio (YCharts page table)")
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

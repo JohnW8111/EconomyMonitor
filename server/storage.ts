@@ -1,16 +1,15 @@
-import { type User, type InsertUser, type PutCallRatio, type InsertPutCallRatio, putCallRatios, users } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type User, type InsertUser, type SpxPutCall, type InsertSpxPutCall, spxPutCallHistory, users } from "@shared/schema";
 import { db } from "./db";
-import { desc, gte, and, lte, eq } from "drizzle-orm";
+import { desc, gte, and, lte, eq, asc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getPutCallRatio(date: string): Promise<PutCallRatio | undefined>;
-  getPutCallRatiosByDateRange(startDate: string, endDate: string): Promise<PutCallRatio[]>;
-  upsertPutCallRatio(data: InsertPutCallRatio): Promise<PutCallRatio>;
-  getLatestPutCallRatios(limit: number): Promise<PutCallRatio[]>;
+  getSpxPutCallByDate(date: string): Promise<SpxPutCall | undefined>;
+  getSpxPutCallHistory(): Promise<SpxPutCall[]>;
+  upsertSpxPutCall(data: InsertSpxPutCall): Promise<SpxPutCall>;
+  bulkUpsertSpxPutCall(data: InsertSpxPutCall[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -29,41 +28,40 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getPutCallRatio(date: string): Promise<PutCallRatio | undefined> {
-    const result = await db.select().from(putCallRatios).where(eq(putCallRatios.date, date)).limit(1);
+  async getSpxPutCallByDate(date: string): Promise<SpxPutCall | undefined> {
+    const result = await db.select().from(spxPutCallHistory).where(eq(spxPutCallHistory.date, date)).limit(1);
     return result[0];
   }
 
-  async getPutCallRatiosByDateRange(startDate: string, endDate: string): Promise<PutCallRatio[]> {
+  async getSpxPutCallHistory(): Promise<SpxPutCall[]> {
     const result = await db.select()
-      .from(putCallRatios)
-      .where(and(gte(putCallRatios.date, startDate), lte(putCallRatios.date, endDate)))
-      .orderBy(desc(putCallRatios.date));
+      .from(spxPutCallHistory)
+      .orderBy(asc(spxPutCallHistory.date));
     return result;
   }
 
-  async upsertPutCallRatio(data: InsertPutCallRatio): Promise<PutCallRatio> {
-    const result = await db.insert(putCallRatios)
+  async upsertSpxPutCall(data: InsertSpxPutCall): Promise<SpxPutCall> {
+    const result = await db.insert(spxPutCallHistory)
       .values(data)
       .onConflictDoUpdate({
-        target: putCallRatios.date,
-        set: {
-          ratio: data.ratio,
-          callVolume: data.callVolume,
-          putVolume: data.putVolume,
-          totalVolume: data.totalVolume,
-        }
+        target: spxPutCallHistory.date,
+        set: { ratio: data.ratio }
       })
       .returning();
     return result[0];
   }
 
-  async getLatestPutCallRatios(limit: number): Promise<PutCallRatio[]> {
-    const result = await db.select()
-      .from(putCallRatios)
-      .orderBy(desc(putCallRatios.date))
-      .limit(limit);
-    return result;
+  async bulkUpsertSpxPutCall(data: InsertSpxPutCall[]): Promise<void> {
+    if (data.length === 0) return;
+    
+    for (const item of data) {
+      await db.insert(spxPutCallHistory)
+        .values(item)
+        .onConflictDoUpdate({
+          target: spxPutCallHistory.date,
+          set: { ratio: item.ratio }
+        });
+    }
   }
 }
 
