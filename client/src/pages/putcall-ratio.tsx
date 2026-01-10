@@ -1,25 +1,25 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, ComposedChart, Bar, ReferenceLine } from "recharts";
-import { AlertTriangle, Info, RefreshCw } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, ComposedChart, ReferenceLine, Area } from "recharts";
+import { AlertTriangle, Info, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPutCallHistory } from "@/lib/api";
+import { fetchSpxPutCallHistory } from "@/lib/api";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-popover border border-border p-3 rounded-lg shadow-xl text-xs">
-        <p className="font-mono mb-2 text-muted-foreground">{format(parseISO(label), "MMM dd, yyyy")}</p>
+        <p className="font-mono mb-2 text-muted-foreground">{format(parseISO(label), "EEE, MMM dd, yyyy")}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 mb-1">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
             <span className="text-muted-foreground">{entry.name}:</span>
             <span className="font-mono font-medium text-foreground">
-              {entry.name === "Z-Score" ? Number(entry.value).toFixed(2) : entry.value.toFixed(2)}
+              {entry.name === "Put/Call Ratio" ? Number(entry.value).toFixed(2) :
+               entry.value.toLocaleString()}
             </span>
           </div>
         ))}
@@ -29,12 +29,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+function formatVolume(value: number): string {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`;
+  }
+  return value.toString();
+}
+
 export default function PutCallRatio() {
-  const [period, setPeriod] = useState('2y');
-  
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['putcall-history', period],
-    queryFn: () => fetchPutCallHistory(period),
+    queryKey: ['spx-putcall-history'],
+    queryFn: fetchSpxPutCallHistory,
     staleTime: 12 * 60 * 60 * 1000,
     refetchInterval: false,
     retry: false,
@@ -45,7 +53,7 @@ export default function PutCallRatio() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading Put-Call Ratio data from CBOE...</p>
+          <p className="text-muted-foreground">Loading SPX Put-Call Ratio data from CBOE...</p>
         </div>
       </div>
     );
@@ -80,32 +88,50 @@ export default function PutCallRatio() {
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">No data available</p>
+        <Card className="max-w-lg">
+          <CardHeader>
+            <CardTitle>No Data Available</CardTitle>
+            <CardDescription>
+              SPX Put-Call Ratio data is being collected. Data is scraped from CBOE daily market statistics.
+              Please check back after market hours.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => refetch()} variant="outline" className="w-full" data-testid="button-refresh-empty">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   const latest = data[data.length - 1];
+  const previous = data.length > 1 ? data[data.length - 2] : null;
+  const ratioChange = previous ? latest.ratio - previous.ratio : 0;
   
-  const isLow = latest.indexZScore < -1.5;
-  const isHigh = latest.indexZScore > 1.5;
-
-  const zScoreData = data.filter((d: any) => d.indexZScore !== 0);
+  const avgRatio = data.reduce((sum, d) => sum + d.ratio, 0) / data.length;
+  const isBearish = latest.ratio > 1.2;
+  const isBullish = latest.ratio < 0.8;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Index Put-Call Ratio</h1>
-          <p className="text-muted-foreground mt-1">Positioning / Hedging Tone from CBOE Index Options</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">SPX Put-Call Ratio</h1>
+          <p className="text-muted-foreground mt-1">S&P 500 Index Options (SPX + SPXW) Volume-Based Put/Call Ratio</p>
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={isLow ? "destructive" : isHigh ? "secondary" : "outline"} className="px-3 py-1 text-sm font-medium uppercase tracking-wide">
-                {isLow ? "Complacent" : isHigh ? "Hedging/Fear" : "Normal"}
+            <Badge 
+              variant={isBearish ? "destructive" : isBullish ? "default" : "outline"} 
+              className="px-3 py-1 text-sm font-medium uppercase tracking-wide"
+            >
+              {isBearish ? "Bearish Hedging" : isBullish ? "Bullish Sentiment" : "Neutral"}
             </Badge>
-            <Badge variant={Math.abs(latest.indexZScore) > 1.5 ? "destructive" : "secondary"} className="px-3 py-1 text-sm font-medium uppercase tracking-wide">
-                Z-Score: {latest.indexZScore.toFixed(2)}
+            <Badge variant="secondary" className="px-3 py-1 text-sm font-medium uppercase tracking-wide">
+              Ratio: {latest.ratio.toFixed(2)}
             </Badge>
             <Button 
               variant="outline" 
@@ -119,100 +145,93 @@ export default function PutCallRatio() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {['1y', '2y', '5y', '10y', 'max'].map(p => (
-          <Button 
-            key={p}
-            variant={period === p ? "default" : "outline"}
-            size="sm"
-            onClick={() => setPeriod(p)}
-            data-testid={`button-period-${p}`}
-          >
-            {p.toUpperCase()}
-          </Button>
-        ))}
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className={cn((isLow || isHigh) && "border-destructive/50 bg-destructive/5")}>
+        <Card className="bg-card/50 backdrop-blur">
           <CardHeader className="pb-2">
-            <CardDescription>Index P/C Ratio</CardDescription>
-            <CardTitle className={cn("text-2xl font-mono-nums", isLow ? "text-amber-500" : isHigh ? "text-destructive" : "text-green-500")} data-testid="text-index-ratio">
-              {latest.indexRatio.toFixed(2)}
-            </CardTitle>
+            <CardDescription>Current Ratio</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground">{isLow ? "Low = complacency" : isHigh ? "High = hedging/fear" : "Normal range"}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Equity P/C Ratio</CardDescription>
-            <CardTitle className="text-2xl font-mono-nums">{latest.equityRatio.toFixed(2)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">Single stocks</div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold font-mono text-foreground" data-testid="text-current-ratio">{latest.ratio.toFixed(2)}</span>
+              {ratioChange !== 0 && (
+                <span className={cn("text-sm flex items-center", ratioChange > 0 ? "text-red-500" : "text-green-500")}>
+                  {ratioChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {Math.abs(ratioChange).toFixed(2)}
+                </span>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card/50 backdrop-blur">
           <CardHeader className="pb-2">
-            <CardDescription>Total P/C Ratio</CardDescription>
-            <CardTitle className="text-2xl font-mono-nums">{latest.totalRatio.toFixed(2)}</CardTitle>
+            <CardDescription>7-Day Average</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground">All options</div>
+            <span className="text-3xl font-bold font-mono text-foreground" data-testid="text-avg-ratio">{avgRatio.toFixed(2)}</span>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card/50 backdrop-blur">
           <CardHeader className="pb-2">
-            <CardDescription>Index Z-Score (1Y)</CardDescription>
-            <CardTitle className={cn("text-2xl font-mono-nums", Math.abs(latest.indexZScore) > 1.5 && "text-destructive")} data-testid="text-zscore">
-              {latest.indexZScore.toFixed(2)}σ
-            </CardTitle>
+            <CardDescription>Put Volume</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground">{Math.abs(latest.indexZScore) > 1.5 ? "Extreme reading" : "Normal range"}</div>
+            <span className="text-3xl font-bold font-mono text-red-500" data-testid="text-put-volume">{formatVolume(latest.putVolume)}</span>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/50 backdrop-blur">
+          <CardHeader className="pb-2">
+            <CardDescription>Call Volume</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <span className="text-3xl font-bold font-mono text-green-500" data-testid="text-call-volume">{formatVolume(latest.callVolume)}</span>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Index Put-Call Ratio History</CardTitle>
-          <CardDescription>CBOE Index Options Put-Call Ratio</CardDescription>
+          <CardTitle>Put-Call Ratio (Last 7 Trading Days)</CardTitle>
+          <CardDescription>
+            SPX + SPXW volume-based put/call ratio from CBOE daily market statistics
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[350px] w-full">
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <ComposedChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="ratioGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="date" 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={12}
-                  tickFormatter={(str) => format(parseISO(str), "MMM yy")}
-                  minTickGap={40}
+                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickFormatter={(value) => format(parseISO(value), "MM/dd")}
                 />
                 <YAxis 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={12}
+                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                   domain={['auto', 'auto']}
+                  tickFormatter={(value) => value.toFixed(2)}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={1} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                <ReferenceLine y={1} stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" opacity={0.5} />
                 <Area 
                   type="monotone" 
-                  dataKey="indexRatio" 
-                  name="Index P/C"
-                  stroke="hsl(var(--chart-4))" 
-                  fill="hsl(var(--chart-4))"
-                  fillOpacity={0.3}
+                  dataKey="ratio" 
+                  stroke="hsl(var(--primary))" 
                   strokeWidth={2}
+                  fill="url(#ratioGradient)"
+                  name="Put/Call Ratio"
                 />
-              </AreaChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
@@ -220,108 +239,56 @@ export default function PutCallRatio() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Index vs Equity Put-Call Ratio</CardTitle>
-          <CardDescription>Comparing index and single-stock option positioning</CardDescription>
+          <CardTitle>Volume Breakdown</CardTitle>
+          <CardDescription>
+            Daily put and call volumes for SPX + SPXW options
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <BarChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="date" 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={12}
-                  tickFormatter={(str) => format(parseISO(str), "MMM yy")}
-                  minTickGap={40}
+                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickFormatter={(value) => format(parseISO(value), "MM/dd")}
                 />
                 <YAxis 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={12}
-                  domain={['auto', 'auto']}
+                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickFormatter={(value) => formatVolume(value)}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Area 
-                  type="monotone" 
-                  dataKey="indexRatio" 
-                  name="Index P/C"
-                  stroke="hsl(var(--chart-4))" 
-                  fill="hsl(var(--chart-4))"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="equityRatio" 
-                  name="Equity P/C"
-                  stroke="hsl(var(--chart-1))" 
-                  fill="hsl(var(--chart-1))"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-              </AreaChart>
+                <Bar dataKey="callVolume" fill="hsl(142, 76%, 36%)" name="Call Volume" stackId="a" />
+                <Bar dataKey="putVolume" fill="hsl(0, 84%, 60%)" name="Put Volume" stackId="a" />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Index P/C Z-Score (Rolling 1-Year)</CardTitle>
-          <CardDescription>Standard deviations from the mean ({zScoreData.length} data points)</CardDescription>
+      <Card className="bg-muted/30">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">About This Indicator</CardTitle>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px] w-full">
-            {zScoreData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={zScoreData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12}
-                    tickFormatter={(str) => format(parseISO(str), "MMM yy")}
-                    minTickGap={40}
-                  />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12}
-                    domain={[-4, 4]}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
-                  <ReferenceLine y={1.5} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
-                  <ReferenceLine y={-1.5} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
-                  <Bar 
-                    dataKey="indexZScore" 
-                    name="Z-Score"
-                    fill="hsl(var(--chart-4))"
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Need 252+ trading days of history to calculate Z-scores
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-muted/30 border-none">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
-            <Info className="h-6 w-6 text-primary mt-1" />
-            <div className="space-y-2">
-              <h3 className="font-semibold text-foreground">Why this matters</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Very low index put-call ratios indicate complacency and call-chasing. Very high levels signal fear or heavy hedging. Extreme readings in either direction, especially divergence between index and equity ratios, can be informative for market positioning.
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Data updates daily (EOD) • Source: CBOE Options Data
-              </p>
-            </div>
-          </div>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+          <p>
+            The SPX Put-Call Ratio measures the volume of put options versus call options on S&P 500 index options 
+            (SPX and SPXW). A ratio above 1.0 indicates more puts are being traded than calls, suggesting increased 
+            hedging activity or bearish sentiment.
+          </p>
+          <p>
+            <strong>Interpretation:</strong> Ratios above 1.2 typically indicate elevated hedging/fear, while ratios 
+            below 0.8 may suggest complacency or bullish positioning. Extreme readings can be contrarian indicators.
+          </p>
+          <p className="text-xs opacity-70">
+            Data Source: CBOE Daily Market Statistics. Data is scraped from the official CBOE website and cached for 12 hours.
+          </p>
         </CardContent>
       </Card>
     </div>

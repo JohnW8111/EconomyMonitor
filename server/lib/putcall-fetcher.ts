@@ -1,210 +1,168 @@
-import { subYears, format, parse } from "date-fns";
+import { format, subDays, isWeekend, startOfDay } from "date-fns";
+import { storage } from "../storage";
 
-export interface PutCallDataPoint {
+export interface SpxPutCallDataPoint {
   date: string;
-  indexRatio: number;
-  equityRatio: number | null;
-  totalRatio: number | null;
-  indexZScore: number;
+  ratio: number;
+  callVolume: number;
+  putVolume: number;
+  totalVolume: number;
 }
 
-const WINDOW_SIZE = 252;
+const CBOE_DAILY_URL = "https://www.cboe.com/us/options/market_statistics/daily/";
 
-const CBOE_INDEX_CSV = "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/indexpcarchive.csv";
-const CBOE_EQUITY_CSV = "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv";
-const CBOE_TOTAL_CSV = "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/pcratioarchive.csv";
-
-function parseFlexibleDate(dateStr: string): string | null {
-  const formats = [
-    'M/d/yyyy',
-    'MM/dd/yyyy',
-    'yyyy-MM-dd',
-    'MM-dd-yyyy',
-  ];
+function getLastNTradingDays(n: number, fromDate: Date = new Date()): string[] {
+  const dates: string[] = [];
+  let currentDate = startOfDay(fromDate);
   
-  for (const fmt of formats) {
-    try {
-      const parsed = parse(dateStr.trim(), fmt, new Date());
-      if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1990 && parsed.getFullYear() < 2100) {
-        return format(parsed, 'yyyy-MM-dd');
-      }
-    } catch {}
-  }
-  return null;
-}
-
-async function fetchCboeArchive(url: string): Promise<Map<string, number>> {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-  });
-
-  if (!response.ok) {
-    throw new Error(`CBOE fetch error: ${response.statusText}`);
-  }
-
-  const text = await response.text();
-  const lines = text.replace(/\r/g, '').trim().split('\n');
-  
-  let headerIndex = -1;
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
-    const lower = lines[i].toLowerCase();
-    if (lower.includes('trade_date') || lower.includes('date,')) {
-      headerIndex = i;
-      break;
+  while (dates.length < n) {
+    if (!isWeekend(currentDate)) {
+      dates.push(format(currentDate, 'yyyy-MM-dd'));
     }
+    currentDate = subDays(currentDate, 1);
   }
   
-  if (headerIndex === -1) {
-    throw new Error('Could not find header row in CSV');
-  }
+  return dates;
+}
 
-  const header = lines[headerIndex].toLowerCase();
-  const columns = header.split(',').map(c => c.trim());
-  
-  const dateColIdx = columns.findIndex(c => 
-    c === 'trade_date' || c === 'date' || c === 'dt' || c === 'day'
-  );
-  
-  let ratioColIdx = columns.findIndex(c => 
-    c === 'p/c ratio' || c === 'put/call ratio' || c === 'pc ratio' ||
-    (c.includes('ratio') && (c.includes('put') || c.includes('p/c') || c.includes('call')))
-  );
-
-  let putColIdx = -1;
-  let callColIdx = -1;
-  
-  if (ratioColIdx === -1) {
-    putColIdx = columns.findIndex(c => c === 'put' || (c.includes('put') && !c.includes('ratio')));
-    callColIdx = columns.findIndex(c => c === 'call' || (c.includes('call') && !c.includes('ratio')));
-  }
-
-  const result = new Map<string, number>();
-
-  for (let i = headerIndex + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+async function scrapeCboeDaily(dateStr: string): Promise<SpxPutCallDataPoint | null> {
+  try {
+    const url = `${CBOE_DAILY_URL}?dt=${dateStr}`;
     
-    const cells = line.split(',').map(c => c.trim());
+    console.log(`[putcall-fetcher] Scraping CBOE for date: ${dateStr}`);
     
-    const dateStr = cells[dateColIdx >= 0 ? dateColIdx : 0];
-    const formattedDate = parseFlexibleDate(dateStr);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`[putcall-fetcher] HTTP error for ${dateStr}: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
     
-    if (!formattedDate) continue;
+    const ratioMatch = html.match(/SPX\s*\+\s*SPXW\s+PUT\/CALL\s+RATIO[^\d]*?([\d.]+)/i);
+    
+    if (!ratioMatch) {
+      const tableMatch = html.match(/\|\s*SPX\s*\+\s*SPXW\s+PUT\/CALL\s+RATIO\s*\|\s*([\d.]+)\s*\|/i);
+      if (!tableMatch) {
+        console.log(`[putcall-fetcher] Could not find SPX+SPXW ratio for ${dateStr}`);
+        return null;
+      }
+    }
     
     let ratio: number | null = null;
     
-    if (ratioColIdx >= 0 && cells[ratioColIdx]) {
-      const val = cells[ratioColIdx].replace(/[,%\s]/g, '');
-      ratio = parseFloat(val);
-    } else if (putColIdx >= 0 && callColIdx >= 0 && cells[putColIdx] && cells[callColIdx]) {
-      const put = parseFloat(cells[putColIdx].replace(/[,\s]/g, ''));
-      const call = parseFloat(cells[callColIdx].replace(/[,\s]/g, ''));
-      if (call > 0 && !isNaN(put) && !isNaN(call)) {
-        ratio = put / call;
+    const ratioPatterns = [
+      /SPX\s*\+\s*SPXW\s+PUT\/CALL\s+RATIO[^\d]*?([\d.]+)/i,
+      /\|\s*SPX\s*\+\s*SPXW\s+PUT\/CALL\s+RATIO\s*\|\s*([\d.]+)\s*\|/i,
+      /"SPX\s*\+\s*SPXW\s+PUT\/CALL\s+RATIO"[^:]*:\s*([\d.]+)/i,
+    ];
+    
+    for (const pattern of ratioPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        ratio = parseFloat(match[1]);
+        if (!isNaN(ratio) && ratio > 0 && ratio < 20) {
+          break;
+        }
+        ratio = null;
       }
     }
-
-    if (ratio !== null && !isNaN(ratio) && ratio > 0 && ratio < 20) {
-      result.set(formattedDate, Number(ratio.toFixed(4)));
+    
+    if (ratio === null) {
+      console.log(`[putcall-fetcher] Could not parse ratio for ${dateStr}`);
+      return null;
     }
-  }
 
-  return result;
+    let callVolume = 0;
+    let putVolume = 0;
+    let totalVolume = 0;
+    
+    const spxSectionMatch = html.match(/SPX\s*\+\s*SPXW[\s\S]*?VOLUME\s*\|\s*([\d,]+)\s*\|\s*([\d,]+)\s*\|\s*([\d,]+)/i);
+    
+    if (spxSectionMatch) {
+      callVolume = parseInt(spxSectionMatch[1].replace(/,/g, ''), 10);
+      putVolume = parseInt(spxSectionMatch[2].replace(/,/g, ''), 10);
+      totalVolume = parseInt(spxSectionMatch[3].replace(/,/g, ''), 10);
+    } else {
+      const volumePatterns = [
+        /\|\s*SPX\s*\+\s*SPXW\s*\|[\s\S]*?\|\s*VOLUME\s*\|\s*([\d,]+)\s*\|\s*([\d,]+)\s*\|\s*([\d,]+)/i,
+        /"SPX\s*\+\s*SPXW"[\s\S]*?"VOLUME"[^:]*:\s*\[([\d,]+),\s*([\d,]+),\s*([\d,]+)\]/i,
+      ];
+      
+      for (const pattern of volumePatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          callVolume = parseInt(match[1].replace(/,/g, ''), 10);
+          putVolume = parseInt(match[2].replace(/,/g, ''), 10);
+          totalVolume = parseInt(match[3].replace(/,/g, ''), 10);
+          break;
+        }
+      }
+    }
+    
+    if (totalVolume === 0 && (callVolume > 0 || putVolume > 0)) {
+      totalVolume = callVolume + putVolume;
+    }
+
+    console.log(`[putcall-fetcher] Scraped ${dateStr}: ratio=${ratio}, call=${callVolume}, put=${putVolume}, total=${totalVolume}`);
+    
+    return {
+      date: dateStr,
+      ratio,
+      callVolume,
+      putVolume,
+      totalVolume,
+    };
+  } catch (error) {
+    console.error(`[putcall-fetcher] Error scraping ${dateStr}:`, error);
+    return null;
+  }
 }
 
-export async function fetchPutCallData(period: string = '2y'): Promise<PutCallDataPoint[]> {
-  const endDate = new Date();
-
-  console.log('[putcall-fetcher] Fetching CBOE archives...');
+export async function fetchPutCallData(): Promise<SpxPutCallDataPoint[]> {
+  const tradingDays = getLastNTradingDays(7);
+  console.log('[putcall-fetcher] Checking last 7 trading days:', tradingDays);
   
-  const [indexData, equityData, totalData] = await Promise.all([
-    fetchCboeArchive(CBOE_INDEX_CSV),
-    fetchCboeArchive(CBOE_EQUITY_CSV).catch((e) => { console.log('[putcall-fetcher] Equity fetch error:', e.message); return new Map<string, number>(); }),
-    fetchCboeArchive(CBOE_TOTAL_CSV).catch((e) => { console.log('[putcall-fetcher] Total fetch error:', e.message); return new Map<string, number>(); })
-  ]);
-
-  console.log('[putcall-fetcher] Index data size:', indexData.size);
-  console.log('[putcall-fetcher] Equity data size:', equityData.size);
-  console.log('[putcall-fetcher] Total data size:', totalData.size);
+  const existingData = await storage.getLatestPutCallRatios(14);
+  const existingDates = new Set(existingData.map(d => d.date));
   
-  // Debug: sample of dates
-  const sampleDates = Array.from(indexData.keys()).slice(-5);
-  console.log('[putcall-fetcher] Sample recent dates from index:', sampleDates);
-
-  const allDates = new Set(Array.from(indexData.keys()));
-  const sortedDates = Array.from(allDates).sort();
-  console.log('[putcall-fetcher] Total unique dates:', sortedDates.length);
-  console.log('[putcall-fetcher] Date range:', sortedDates[0], 'to', sortedDates[sortedDates.length - 1]);
-
-  const rawData: Array<{ 
-    date: string; 
-    indexRatio: number; 
-    equityRatio: number | null;
-    totalRatio: number | null;
-  }> = [];
-
-  for (const date of sortedDates) {
-    const indexRatio = indexData.get(date);
-
-    if (indexRatio !== undefined) {
-      rawData.push({
-        date,
-        indexRatio: Number(indexRatio.toFixed(2)),
-        equityRatio: equityData.get(date) ? Number(equityData.get(date)!.toFixed(2)) : null,
-        totalRatio: totalData.get(date) ? Number(totalData.get(date)!.toFixed(2)) : null
+  console.log('[putcall-fetcher] Existing dates in DB:', Array.from(existingDates));
+  
+  const missingDates = tradingDays.filter(d => !existingDates.has(d));
+  console.log('[putcall-fetcher] Missing dates to fetch:', missingDates);
+  
+  for (const dateStr of missingDates) {
+    const data = await scrapeCboeDaily(dateStr);
+    if (data) {
+      await storage.upsertPutCallRatio({
+        date: data.date,
+        ratio: data.ratio,
+        callVolume: data.callVolume,
+        putVolume: data.putVolume,
+        totalVolume: data.totalVolume,
       });
+      console.log(`[putcall-fetcher] Stored data for ${dateStr}`);
     }
   }
-
-  let displayStart: Date;
-  switch (period) {
-    case '1y':
-      displayStart = subYears(endDate, 1);
-      break;
-    case '2y':
-      displayStart = subYears(endDate, 2);
-      break;
-    case '5y':
-      displayStart = subYears(endDate, 5);
-      break;
-    case '10y':
-      displayStart = subYears(endDate, 10);
-      break;
-    case 'max':
-      displayStart = new Date('2000-01-01');
-      break;
-    default:
-      displayStart = subYears(endDate, 2);
-  }
-
-  const displayStartStr = format(displayStart, 'yyyy-MM-dd');
-  console.log('[putcall-fetcher] Display start:', displayStartStr);
-  console.log('[putcall-fetcher] rawData length:', rawData.length);
-
-  const indexHistory: number[] = [];
-  const result: PutCallDataPoint[] = [];
-
-  let historyIndex = 0;
-  for (const point of rawData) {
-    indexHistory.push(point.indexRatio);
-    historyIndex++;
-    
-    if (point.date < displayStartStr) continue;
-
-    let zScore = 0;
-    if (historyIndex >= WINDOW_SIZE) {
-      const window = indexHistory.slice(historyIndex - WINDOW_SIZE, historyIndex);
-      const mean = window.reduce((a, b) => a + b, 0) / WINDOW_SIZE;
-      const variance = window.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / WINDOW_SIZE;
-      const stdDev = Math.sqrt(variance);
-      zScore = stdDev > 0 ? (point.indexRatio - mean) / stdDev : 0;
-    }
-
-    result.push({
-      ...point,
-      indexZScore: Number(zScore.toFixed(2))
-    });
-  }
-
+  
+  const allData = await storage.getLatestPutCallRatios(7);
+  
+  const result: SpxPutCallDataPoint[] = allData
+    .map(d => ({
+      date: d.date,
+      ratio: d.ratio,
+      callVolume: d.callVolume,
+      putVolume: d.putVolume,
+      totalVolume: d.totalVolume,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  console.log('[putcall-fetcher] Returning', result.length, 'data points');
   return result;
 }

@@ -216,18 +216,17 @@ export async function registerRoutes(
     }
   });
 
-  // Get Put-Call Ratio data
+  // Get SPX Put-Call Ratio data (last 7 trading days)
   app.get("/api/putcall/history", async (req, res) => {
     try {
-      const period = (req.query.period as string) || '2y';
-      const cacheKey = `putcall-history-v2-${period}`;
+      const cacheKey = 'spx-putcall-history';
       
       const cachedData = cache.get(cacheKey);
       if (cachedData) {
         return res.json(cachedData);
       }
 
-      const data = await fetchPutCallData(period);
+      const data = await fetchPutCallData();
       cache.set(cacheKey, data);
       
       res.json(data);
