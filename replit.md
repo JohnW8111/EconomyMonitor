@@ -31,6 +31,11 @@ Key API endpoints:
 - `GET /api/vix/history` - Historical VIX term structure data
 - `GET /api/vix/latest` - Current VIX quotes
 - `GET /api/hy-spread/history` - High-yield credit spread history
+- `GET /api/hy-ig-ratio/history` - HY/IG spread ratio history
+- `GET /api/sofr-spread/history` - SOFR-Treasury spread (funding stress)
+- `GET /api/jnk-premium/history` - JNK ETF discount/premium
+- `GET /api/yield-curve/history` - Yield curve slope (10Y-3M)
+- `GET /api/erp-proxy/history` - Equity risk premium proxy
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
@@ -59,6 +64,23 @@ Key API endpoints:
   - VIXCLS: CBOE Volatility Index
   - VXVCLS: CBOE 3-Month Volatility Index  
   - BAMLH0A0HYM2: ICE BofA US High Yield Option-Adjusted Spread
+  - BAMLC0A0CM: ICE BofA US Corporate Investment Grade Index
+  - SOFR90DAYAVG: 90-Day SOFR Average
+  - DTB3: 3-Month Treasury Bill
+  - DGS10: 10-Year Treasury Constant Maturity Rate
+  - DGS3MO: 3-Month Treasury Constant Maturity Rate
+  - SP500: S&P 500 Index
+  - DFII10: 10-Year Treasury Inflation-Indexed Security
+- **State Street SPDR**: JNK ETF NAV data for discount/premium calculation
+
+## Active Risk Indicators (7 total)
+1. **(Volatility) VIX Term Structure** - VIX vs VIX3M slope with z-score
+2. **(Credit) HY Credit Spread** - High-yield option-adjusted spread
+3. **(Credit) HY/IG Spread Ratio** - High-yield to investment-grade spread ratio
+4. **(Funding & Liquidity) Funding Stress** - SOFR-Treasury spread
+5. **(Funding & Liquidity) HY ETF Discount/Premium** - JNK ETF premium to NAV
+6. **(Macro/Curve) Yield Curve Slope** - 10Y-3M Treasury spread
+7. **(Valuation) Equity Risk Premium** - Earnings yield minus real yields
 
 ### Key NPM Dependencies
 - `drizzle-orm` / `drizzle-kit`: Database ORM and migrations

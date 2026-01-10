@@ -12,7 +12,6 @@ import SofrSpread from "@/pages/sofr-spread";
 import JnkPremium from "@/pages/jnk-premium";
 import YieldCurve from "@/pages/yield-curve";
 import ErpProxy from "@/pages/erp-proxy";
-import PutCallRatio from "@/pages/putcall-ratio";
 
 function Router() {
   return (
@@ -25,7 +24,6 @@ function Router() {
         <Route path="/jnk-premium" component={JnkPremium} />
         <Route path="/yield-curve" component={YieldCurve} />
         <Route path="/erp-proxy" component={ErpProxy} />
-        <Route path="/putcall" component={PutCallRatio} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>

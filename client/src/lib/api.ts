@@ -111,18 +111,3 @@ export async function fetchErpProxyHistory(period: string = '2y'): Promise<ErpPr
   return response.json();
 }
 
-export interface SpxPutCallDataPoint {
-  date: string;
-  ratio: number;
-  callVolume: number;
-  putVolume: number;
-  totalVolume: number;
-}
-
-export async function fetchSpxPutCallHistory(): Promise<SpxPutCallDataPoint[]> {
-  const response = await fetch('/api/putcall/history');
-  if (!response.ok) {
-    throw new Error('Failed to fetch SPX Put-Call Ratio history');
-  }
-  return response.json();
-}
