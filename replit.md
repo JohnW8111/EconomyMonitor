@@ -72,15 +72,17 @@ Key API endpoints:
   - SP500: S&P 500 Index
   - DFII10: 10-Year Treasury Inflation-Indexed Security
 - **State Street SPDR**: JNK ETF NAV data for discount/premium calculation
+- **YCharts**: SPX Put-Call Ratio (sources CBOE data) - scraped daily and stored in PostgreSQL for history accumulation
 
-## Active Risk Indicators (7 total)
+## Active Risk Indicators (8 total)
 1. **(Volatility) VIX Term Structure** - VIX vs VIX3M slope with z-score
-2. **(Credit) HY Credit Spread** - High-yield option-adjusted spread
-3. **(Credit) HY/IG Spread Ratio** - High-yield to investment-grade spread ratio
-4. **(Funding & Liquidity) Funding Stress** - SOFR-Treasury spread
-5. **(Funding & Liquidity) HY ETF Discount/Premium** - JNK ETF premium to NAV
-6. **(Macro/Curve) Yield Curve Slope** - 10Y-3M Treasury spread
-7. **(Valuation) Equity Risk Premium** - Earnings yield minus real yields
+2. **(Sentiment) SPX Put-Call Ratio** - CBOE SPX options put/call volume ratio (scraped from YCharts, stored in PostgreSQL for history accumulation)
+3. **(Credit) HY Credit Spread** - High-yield option-adjusted spread
+4. **(Credit) HY/IG Spread Ratio** - High-yield to investment-grade spread ratio
+5. **(Funding & Liquidity) Funding Stress** - SOFR-Treasury spread
+6. **(Funding & Liquidity) HY ETF Discount/Premium** - JNK ETF premium to NAV
+7. **(Macro/Curve) Yield Curve Slope** - 10Y-3M Treasury spread
+8. **(Valuation) Equity Risk Premium** - Earnings yield minus real yields
 
 ### Key NPM Dependencies
 - `drizzle-orm` / `drizzle-kit`: Database ORM and migrations

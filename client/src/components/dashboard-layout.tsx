@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 const RISK_INDICATORS = [
   { id: "vix", name: "(Volatility) VIX Term Structure", href: "/", icon: Activity, active: true },
+  { id: "spx-putcall", name: "(Sentiment) SPX Put-Call Ratio", href: "/spx-putcall", icon: Activity, active: true },
   { id: "hy-spread", name: "(Credit) HY Credit Spread", href: "/hy-spread", icon: DollarSign, active: true },
   { id: "hy-ig-ratio", name: "(Credit) HY/IG Spread Ratio", href: "/hy-ig-ratio", icon: TrendingUp, active: true },
   { id: "sofr-spread", name: "(Funding & Liquidity) Funding Stress", href: "/sofr-spread", icon: TrendingUp, active: true },
@@ -69,7 +70,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <div className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-muted-foreground">
-            Data Sources: FRED, State Street
+            Data Sources: FRED, State Street, YCharts
         </div>
       </div>
     </div>

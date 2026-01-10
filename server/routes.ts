@@ -8,6 +8,7 @@ import { fetchSofrSpreadData } from "./lib/sofr-spread-fetcher";
 import { fetchJnkPremiumData } from "./lib/jnk-premium-fetcher";
 import { fetchYieldCurveData } from "./lib/yield-curve-fetcher";
 import { fetchErpProxyData } from "./lib/erp-proxy-fetcher";
+import { fetchSpxPutCallData, getStoredDataCount } from "./lib/spx-putcall-fetcher";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
@@ -212,6 +213,40 @@ export async function registerRoutes(
         error: 'Failed to fetch ERP Proxy data',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  // Get SPX Put-Call Ratio data (scraped from YCharts + stored history)
+  app.get("/api/putcall/history", async (req, res) => {
+    try {
+      const cacheKey = 'spx-putcall-history';
+      
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchSpxPutCallData();
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/putcall/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch SPX Put-Call Ratio data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get count of stored SPX Put-Call data points
+  app.get("/api/putcall/count", async (req, res) => {
+    try {
+      const count = await getStoredDataCount();
+      res.json({ count });
+    } catch (error) {
+      console.error('Error in /api/putcall/count:', error);
+      res.status(500).json({ error: 'Failed to get count' });
     }
   });
 

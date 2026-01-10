@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/dashboard-layout";
 import VixTermStructure from "@/pages/vix-term-structure";
+import SpxPutCall from "@/pages/spx-putcall";
 import HyCreditSpread from "@/pages/hy-credit-spread";
 import HyIgRatio from "@/pages/hy-ig-ratio";
 import SofrSpread from "@/pages/sofr-spread";
@@ -18,6 +19,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={VixTermStructure} />
+        <Route path="/spx-putcall" component={SpxPutCall} />
         <Route path="/hy-spread" component={HyCreditSpread} />
         <Route path="/hy-ig-ratio" component={HyIgRatio} />
         <Route path="/sofr-spread" component={SofrSpread} />
