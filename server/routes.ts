@@ -9,6 +9,7 @@ import { fetchJnkPremiumData } from "./lib/jnk-premium-fetcher";
 import { fetchYieldCurveData } from "./lib/yield-curve-fetcher";
 import { fetchErpProxyData } from "./lib/erp-proxy-fetcher";
 import { fetchSpxPutCallData, getStoredDataCount } from "./lib/spx-putcall-fetcher";
+import { fetchNfciData } from "./lib/nfci-fetcher";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
@@ -247,6 +248,30 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error in /api/putcall/count:', error);
       res.status(500).json({ error: 'Failed to get count' });
+    }
+  });
+
+  // Get NFCI (National Financial Conditions Index) data - weekly
+  app.get("/api/nfci/history", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2y';
+      const cacheKey = `nfci-history-${period}`;
+      
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+
+      const data = await fetchNfciData(period);
+      cache.set(cacheKey, data);
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in /api/nfci/history:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch NFCI data',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

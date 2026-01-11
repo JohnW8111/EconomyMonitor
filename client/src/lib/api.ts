@@ -125,3 +125,17 @@ export async function fetchSpxPutCallHistory(): Promise<SpxPutCallDataPoint[]> {
   return response.json();
 }
 
+export interface NfciDataPoint {
+  date: string;
+  nfci: number;
+  nfciZScore: number;
+}
+
+export async function fetchNfciHistory(period: string = '2y'): Promise<NfciDataPoint[]> {
+  const response = await fetch(`/api/nfci/history?period=${period}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch NFCI history');
+  }
+  return response.json();
+}
+

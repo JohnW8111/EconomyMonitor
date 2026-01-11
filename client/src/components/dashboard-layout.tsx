@@ -20,6 +20,7 @@ const RISK_INDICATORS = [
   { id: "jnk-premium", name: "(Funding & Liquidity) HY ETF Discount/Premium", href: "/jnk-premium", icon: DollarSign, active: true },
   { id: "yield-curve", name: "(Macro/Curve) Yield Curve Slope", href: "/yield-curve", icon: TrendingUp, active: true },
   { id: "erp-proxy", name: "(Valuation) Equity Risk Premium", href: "/erp-proxy", icon: TrendingUp, active: true },
+  { id: "nfci", name: "(Composite) Financial Conditions Index", href: "/nfci", icon: Activity, active: true },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

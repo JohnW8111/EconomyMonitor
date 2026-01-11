@@ -71,10 +71,11 @@ Key API endpoints:
   - DGS3MO: 3-Month Treasury Constant Maturity Rate
   - SP500: S&P 500 Index
   - DFII10: 10-Year Treasury Inflation-Indexed Security
+  - NFCI: Chicago Fed National Financial Conditions Index (weekly)
 - **State Street SPDR**: JNK ETF NAV data for discount/premium calculation
 - **YCharts**: SPX Put-Call Ratio (sources CBOE data) - scraped daily and stored in PostgreSQL for history accumulation
 
-## Active Risk Indicators (8 total)
+## Active Risk Indicators (9 total)
 1. **(Volatility) VIX Term Structure** - VIX vs VIX3M slope with z-score
 2. **(Sentiment) SPX Put-Call Ratio** - CBOE SPX options put/call volume ratio (scraped from YCharts, stored in PostgreSQL for history accumulation)
 3. **(Credit) HY Credit Spread** - High-yield option-adjusted spread
@@ -83,6 +84,7 @@ Key API endpoints:
 6. **(Funding & Liquidity) HY ETF Discount/Premium** - JNK ETF premium to NAV
 7. **(Macro/Curve) Yield Curve Slope** - 10Y-3M Treasury spread
 8. **(Valuation) Equity Risk Premium** - Earnings yield minus real yields
+9. **(Composite) Financial Conditions Index** - Chicago Fed NFCI (weekly data from FRED)
 
 ### Key NPM Dependencies
 - `drizzle-orm` / `drizzle-kit`: Database ORM and migrations

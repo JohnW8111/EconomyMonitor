@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""
+Fetch Chicago Fed National Financial Conditions Index (NFCI) from FRED using an API key.
+
+Series: NFCI (weekly)
+Docs: https://fred.stlouisfed.org/docs/api/fred/series_observations.html
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import date
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
+
+
+def fetch_fred_series(
+    api_key: str,
+    series_id: str,
+    observation_start: str = "1971-01-01",
+    observation_end: str | None = None,
+) -> pd.DataFrame:
+    params = {
+        "api_key": api_key,
+        "file_type": "json",
+        "series_id": series_id,
+        "observation_start": observation_start,
+    }
+    if observation_end:
+        params["observation_end"] = observation_end
+
+    r = requests.get(FRED_BASE, params=params, timeout=30)
+    r.raise_for_status()
+    js = r.json()
+
+    obs = js.get("observations", [])
+    if not obs:
+        raise RuntimeError(f"No observations returned for series_id={series_id}")
+
+    df = pd.DataFrame(obs)
+    df["date"] = pd.to_datetime(df["date"])
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df = df.dropna(subset=["value"]).set_index("date").sort_index()
+    df = df.rename(columns={"value": series_id})
+    return df[[series_id]]
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Fetch NFCI from FRED using an API key.")
+    ap.add_argument("--api_key", required=True, help="Your FRED API key.")
+    ap.add_argument("--start", default="1971-01-01", help="Observation start date YYYY-MM-DD.")
+    ap.add_argument("--end", default=None, help="Observation end date YYYY-MM-DD (optional).")
+    ap.add_argument("--tail", type=int, default=10, help="Rows to print from end.")
+    ap.add_argument("--plot", action="store_true", help="Plot the series.")
+    args = ap.parse_args()
+
+    df = fetch_fred_series(args.api_key, "NFCI", observation_start=args.start, observation_end=args.end)
+
+    print("\nNFCI (weekly) — latest rows:")
+    print(df.tail(args.tail).to_string(float_format=lambda x: f"{x:0.5f}"))
+
+    latest_dt = df.index[-1].date()
+    latest_val = float(df.iloc[-1, 0])
+    print(f"\nLatest NFCI: {latest_val:0.5f} on {latest_dt.isoformat()}")
+
+    if args.plot:
+        plt.figure()
+        plt.plot(df.index, df["NFCI"])
+        plt.title("Chicago Fed National Financial Conditions Index (NFCI)")
+        plt.xlabel("Date")
+        plt.ylabel("Index")
+        plt.tight_layout()
+        plt.show()
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
