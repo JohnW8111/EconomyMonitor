@@ -36,6 +36,56 @@ export async function registerRoutes(
       res.status(500).json({ error: 'Failed to check access' });
     }
   });
+
+  app.get("/api/admin/allowed-emails", isAuthenticated, async (req: any, res) => {
+    try {
+      const userEmail = req.user?.claims?.email;
+      if (!userEmail || !(await storage.isEmailAllowed(userEmail))) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const emails = await storage.getAllowedEmails();
+      res.json(emails);
+    } catch (error) {
+      console.error('Error fetching allowed emails:', error);
+      res.status(500).json({ error: 'Failed to fetch allowed emails' });
+    }
+  });
+
+  app.post("/api/admin/allowed-emails", isAuthenticated, async (req: any, res) => {
+    try {
+      const userEmail = req.user?.claims?.email;
+      if (!userEmail || !(await storage.isEmailAllowed(userEmail))) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+      const result = await storage.addAllowedEmail(email);
+      res.json(result);
+    } catch (error) {
+      console.error('Error adding allowed email:', error);
+      res.status(500).json({ error: 'Failed to add email' });
+    }
+  });
+
+  app.delete("/api/admin/allowed-emails/:email", isAuthenticated, async (req: any, res) => {
+    try {
+      const userEmail = req.user?.claims?.email;
+      if (!userEmail || !(await storage.isEmailAllowed(userEmail))) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const emailToRemove = decodeURIComponent(req.params.email);
+      if (emailToRemove.toLowerCase() === userEmail.toLowerCase()) {
+        return res.status(400).json({ error: 'Cannot remove your own email' });
+      }
+      await storage.removeAllowedEmail(emailToRemove);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error removing allowed email:', error);
+      res.status(500).json({ error: 'Failed to remove email' });
+    }
+  });
   // Get VIX term structure data
   app.get("/api/vix/history", async (req, res) => {
     try {

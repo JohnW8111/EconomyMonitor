@@ -5,7 +5,8 @@ import {
   Menu,
   ShieldAlert,
   DollarSign,
-  LogOut
+  LogOut,
+  Settings
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -73,8 +74,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="p-4 border-t border-sidebar-border space-y-3">
+        <Link href="/admin">
+          <div className={cn(
+            "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+            location === "/admin" 
+              ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+              : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+          )}>
+            <Settings className="h-4 w-4" />
+            Access Management
+          </div>
+        </Link>
         {user && (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-sidebar-border">
             <div className="flex items-center gap-2 min-w-0">
               {user.profileImageUrl && (
                 <img src={user.profileImageUrl} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />

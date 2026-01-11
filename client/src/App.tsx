@@ -16,6 +16,7 @@ import JnkPremium from "@/pages/jnk-premium";
 import YieldCurve from "@/pages/yield-curve";
 import ErpProxy from "@/pages/erp-proxy";
 import Nfci from "@/pages/nfci";
+import Admin from "@/pages/admin";
 import Landing from "@/pages/landing";
 import AccessDenied from "@/pages/access-denied";
 
@@ -32,6 +33,7 @@ function Dashboard() {
         <Route path="/yield-curve" component={YieldCurve} />
         <Route path="/erp-proxy" component={ErpProxy} />
         <Route path="/nfci" component={Nfci} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
