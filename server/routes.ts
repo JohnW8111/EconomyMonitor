@@ -10,6 +10,7 @@ import { fetchYieldCurveData } from "./lib/yield-curve-fetcher";
 import { fetchErpProxyData } from "./lib/erp-proxy-fetcher";
 import { fetchSpxPutCallData, getStoredDataCount } from "./lib/spx-putcall-fetcher";
 import { fetchNfciData } from "./lib/nfci-fetcher";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import NodeCache from "node-cache";
 
 // Cache data for 12 hours (43200 seconds) - data only updates daily
@@ -19,6 +20,22 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
+  app.get("/api/auth/check-access", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user?.claims?.email;
+      if (!email) {
+        return res.json({ allowed: false, reason: "No email provided" });
+      }
+      const isAllowed = await storage.isEmailAllowed(email);
+      res.json({ allowed: isAllowed, email });
+    } catch (error) {
+      console.error('Error checking access:', error);
+      res.status(500).json({ error: 'Failed to check access' });
+    }
+  });
   // Get VIX term structure data
   app.get("/api/vix/history", async (req, res) => {
     try {

@@ -1,33 +1,19 @@
-import { type User, type InsertUser, type SpxPutCall, type InsertSpxPutCall, spxPutCallHistory, users } from "@shared/schema";
+import { type SpxPutCall, type InsertSpxPutCall, spxPutCallHistory, allowedEmails, type AllowedEmail } from "@shared/schema";
 import { db } from "./db";
-import { desc, gte, and, lte, eq, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
   getSpxPutCallByDate(date: string): Promise<SpxPutCall | undefined>;
   getSpxPutCallHistory(): Promise<SpxPutCall[]>;
   upsertSpxPutCall(data: InsertSpxPutCall): Promise<SpxPutCall>;
   bulkUpsertSpxPutCall(data: InsertSpxPutCall[]): Promise<void>;
+  isEmailAllowed(email: string): Promise<boolean>;
+  getAllowedEmails(): Promise<AllowedEmail[]>;
+  addAllowedEmail(email: string): Promise<AllowedEmail>;
+  removeAllowedEmail(email: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return result[0];
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(insertUser).returning();
-    return result[0];
-  }
-
   async getSpxPutCallByDate(date: string): Promise<SpxPutCall | undefined> {
     const result = await db.select().from(spxPutCallHistory).where(eq(spxPutCallHistory.date, date)).limit(1);
     return result[0];
@@ -62,6 +48,30 @@ export class DatabaseStorage implements IStorage {
           set: { ratio: item.ratio }
         });
     }
+  }
+
+  async isEmailAllowed(email: string): Promise<boolean> {
+    const normalized = email.toLowerCase().trim();
+    const result = await db.select().from(allowedEmails).where(eq(allowedEmails.email, normalized)).limit(1);
+    return result.length > 0;
+  }
+
+  async getAllowedEmails(): Promise<AllowedEmail[]> {
+    return await db.select().from(allowedEmails).orderBy(asc(allowedEmails.email));
+  }
+
+  async addAllowedEmail(email: string): Promise<AllowedEmail> {
+    const normalized = email.toLowerCase().trim();
+    const result = await db.insert(allowedEmails)
+      .values({ email: normalized })
+      .onConflictDoNothing()
+      .returning();
+    return result[0] || { email: normalized, addedAt: new Date() };
+  }
+
+  async removeAllowedEmail(email: string): Promise<void> {
+    const normalized = email.toLowerCase().trim();
+    await db.delete(allowedEmails).where(eq(allowedEmails.email, normalized));
   }
 }
 

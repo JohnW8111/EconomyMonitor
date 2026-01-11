@@ -4,12 +4,14 @@ import {
   Activity, 
   Menu,
   ShieldAlert,
-  DollarSign
+  DollarSign,
+  LogOut
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 const RISK_INDICATORS = [
   { id: "vix", name: "(Volatility) VIX Term Structure", href: "/", icon: Activity, active: true },
@@ -26,6 +28,7 @@ const RISK_INDICATORS = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const NavContent = () => (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border text-sidebar-foreground">
@@ -69,7 +72,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-3">
+        {user && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {user.profileImageUrl && (
+                <img src={user.profileImageUrl} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
+              )}
+              <span className="text-xs truncate text-foreground">{user.email}</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7 flex-shrink-0"
+              onClick={() => logout()}
+              data-testid="button-logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <div className="text-xs text-muted-foreground">
             Data Sources: FRED, State Street, YCharts
         </div>

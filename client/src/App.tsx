@@ -1,8 +1,10 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
+import { RefreshCw } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/dashboard-layout";
 import VixTermStructure from "@/pages/vix-term-structure";
@@ -14,8 +16,10 @@ import JnkPremium from "@/pages/jnk-premium";
 import YieldCurve from "@/pages/yield-curve";
 import ErpProxy from "@/pages/erp-proxy";
 import Nfci from "@/pages/nfci";
+import Landing from "@/pages/landing";
+import AccessDenied from "@/pages/access-denied";
 
-function Router() {
+function Dashboard() {
   return (
     <Layout>
       <Switch>
@@ -28,11 +32,46 @@ function Router() {
         <Route path="/yield-curve" component={YieldCurve} />
         <Route path="/erp-proxy" component={ErpProxy} />
         <Route path="/nfci" component={Nfci} />
-        {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>
     </Layout>
   );
+}
+
+function AuthenticatedApp() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  const { data: accessCheck, isLoading: isCheckingAccess } = useQuery({
+    queryKey: ['/api/auth/check-access'],
+    queryFn: async () => {
+      const res = await fetch('/api/auth/check-access', { credentials: 'include' });
+      if (!res.ok) return { allowed: false };
+      return res.json();
+    },
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  if (isLoading || (isAuthenticated && isCheckingAccess)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
+  if (!accessCheck?.allowed) {
+    return <AccessDenied />;
+  }
+
+  return <Dashboard />;
 }
 
 function App() {
@@ -40,7 +79,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <AuthenticatedApp />
       </TooltipProvider>
     </QueryClientProvider>
   );
