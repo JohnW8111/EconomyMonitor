@@ -86,6 +86,27 @@ Key API endpoints:
 8. **(Valuation) Equity Risk Premium** - Earnings yield minus real yields
 9. **(Composite) Financial Conditions Index** - Chicago Fed NFCI (weekly data from FRED)
 
+## Authentication & Access Control
+
+- **Authentication**: Replit Auth (OpenID Connect) - users can sign in with Google, GitHub, Apple, X, or email/password
+- **Access Control**: Email allowlist system - only approved email addresses can access the dashboard
+- **Database Tables**: 
+  - `users` - stores authenticated user profiles
+  - `sessions` - stores session data
+  - `allowed_emails` - stores approved email addresses
+
+### Managing Allowed Emails
+
+To add a user to the allowed list, run this SQL:
+```sql
+INSERT INTO allowed_emails (email) VALUES ('user@example.com');
+```
+
+To remove a user:
+```sql
+DELETE FROM allowed_emails WHERE email = 'user@example.com';
+```
+
 ### Key NPM Dependencies
 - `drizzle-orm` / `drizzle-kit`: Database ORM and migrations
 - `@tanstack/react-query`: Server state management
