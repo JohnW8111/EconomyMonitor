@@ -1,7 +1,12 @@
 import { storage } from "../storage";
+import NodeCache from "node-cache";
 
 const YCHARTS_URL = "https://ycharts.com/indicators/cboe_spx_put_call_ratio";
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+const scrapeCache = new NodeCache({ stdTTL: 12 * 60 * 60 });
+const SCRAPE_CACHE_KEY = "spx-putcall-last-scrape";
+const HISTORICAL_DAYS_TO_FETCH = 14;
 
 interface ScrapedData {
   latest: { date: string; value: number } | null;
@@ -70,11 +75,12 @@ async function scrapeYCharts(): Promise<ScrapedData> {
     }
   }
 
-  const historicalRegex = /([A-Za-z]+)\s+(\d{2}),\s+(\d{4})\s+(\d+(?:\.\d+)?)/g;
+  const tableRowRegex = /<td>(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{2}),\s+(\d{4})<\/td>\s*<td[^>]*>\s*(\d+(?:\.\d+)?)/g;
   let match;
   const seen = new Set<string>();
+  let count = 0;
   
-  while ((match = historicalRegex.exec(html)) !== null) {
+  while ((match = tableRowRegex.exec(html)) !== null && count < HISTORICAL_DAYS_TO_FETCH) {
     const monthStr = match[1];
     const day = parseInt(match[2], 10);
     const year = parseInt(match[3], 10);
@@ -88,10 +94,13 @@ async function scrapeYCharts(): Promise<ScrapedData> {
     if (!seen.has(date)) {
       seen.add(date);
       result.historical.push({ date, ratio: value });
+      count++;
     }
   }
 
   result.historical.sort((a, b) => a.date.localeCompare(b.date));
+
+  console.log(`[YCharts Scraper] Extracted ${result.historical.length} historical data points`);
 
   return result;
 }
@@ -124,17 +133,33 @@ function calculateZScores(data: Array<{ date: string; ratio: number }>): Array<{
 }
 
 export async function fetchSpxPutCallData(): Promise<Array<{ date: string; ratio: number; ratioZScore: number }>> {
-  const scraped = await scrapeYCharts();
+  const lastScrape = scrapeCache.get<number>(SCRAPE_CACHE_KEY);
+  const shouldScrape = !lastScrape;
   
-  if (scraped.historical.length > 0) {
-    await storage.bulkUpsertSpxPutCall(scraped.historical);
-  }
+  if (shouldScrape) {
+    console.log('[YCharts] Scraping new data (cache expired or empty)');
+    try {
+      const scraped = await scrapeYCharts();
+      
+      if (scraped.historical.length > 0) {
+        await storage.bulkUpsertSpxPutCall(scraped.historical);
+        console.log(`[YCharts] Stored ${scraped.historical.length} historical data points`);
+      }
 
-  if (scraped.latest && scraped.historical.every(h => h.date !== scraped.latest!.date)) {
-    await storage.upsertSpxPutCall({
-      date: scraped.latest.date,
-      ratio: scraped.latest.value,
-    });
+      if (scraped.latest && scraped.historical.every(h => h.date !== scraped.latest!.date)) {
+        await storage.upsertSpxPutCall({
+          date: scraped.latest.date,
+          ratio: scraped.latest.value,
+        });
+        console.log(`[YCharts] Stored latest data point: ${scraped.latest.date}`);
+      }
+      
+      scrapeCache.set(SCRAPE_CACHE_KEY, Date.now());
+    } catch (err) {
+      console.error('[YCharts] Scraping failed:', err);
+    }
+  } else {
+    console.log('[YCharts] Using cached data (last scrape within 12 hours)');
   }
 
   const storedData = await storage.getSpxPutCallHistory();
