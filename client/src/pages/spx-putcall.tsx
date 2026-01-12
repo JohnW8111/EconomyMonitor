@@ -110,7 +110,7 @@ export default function SpxPutCall() {
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">SPX Put-Call Ratio</h1>
-          <p className="text-muted-foreground mt-1">CBOE SPX Options Put/Call Volume Ratio</p>
+          <p className="text-muted-foreground mt-1">CBOE SPX Options Put/Call Volume Ratio*THIS HAS LIMITED DATA A WORK IN PROGRESS</p>
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
@@ -278,7 +278,7 @@ export default function SpxPutCall() {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 The SPX put-call ratio measures the volume of put options vs call options traded on the S&P 500 index. 
                 A ratio above 1 indicates more puts (bearish bets) than calls (bullish bets), suggesting elevated fear or hedging activity.
-                Extreme readings can signal contrarian opportunities.
+                Extreme readings can signal contrarian opportunities.Rule of thumb 1.5+: extreme hedging / stress conditions
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 Data source: YCharts (CBOE underlying data) • History accumulates daily in local storage

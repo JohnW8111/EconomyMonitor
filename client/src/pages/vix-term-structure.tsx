@@ -355,7 +355,9 @@ export default function VixTermStructure() {
                 <div className="space-y-2">
                     <h3 className="font-semibold text-foreground">Why this matters</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                        When front-month volatility spikes above 3M (backwardation), it's often a sign of acute stress.
+                        When front-month volatility spikes above 3M (backwardation), it's often a sign of acute stress.Interpretation:
+                      Slope very negative (low z-score) → acute stress
+                      Slope very positive (high z-score) → complacency / calm near-term (but can also mean the market is underpricing near-term    risks)
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
                         Data updates daily (EOD) • This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.

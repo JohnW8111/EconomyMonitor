@@ -74,6 +74,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="p-4 border-t border-sidebar-border space-y-3">
+        <a 
+          href="https://simple-blog-pro-johnw8111.replit.app/post/51" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+        >
+          <Activity className="h-4 w-4" />
+          detailed information about all the indicators
+        </a>
         <Link href="/admin">
           <div className={cn(
             "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
