@@ -120,6 +120,28 @@ export async function fetchJnkPremiumData(period: string = '2y'): Promise<JnkPre
 
   rawData.sort((a, b) => a.date.localeCompare(b.date));
 
+  // Calculate Z-scores on ALL data first (before filtering)
+  const allDataWithZScores: JnkPremiumDataPoint[] = [];
+
+  for (let i = 0; i < rawData.length; i++) {
+    const point = rawData[i];
+    let zScore = 0;
+    
+    if (i >= WINDOW_SIZE) {
+      const window = rawData.slice(i - WINDOW_SIZE, i).map(d => d.premium);
+      const mean = window.reduce((a, b) => a + b, 0) / WINDOW_SIZE;
+      const variance = window.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / WINDOW_SIZE;
+      const stdDev = Math.sqrt(variance);
+      zScore = stdDev > 0 ? (point.premium - mean) / stdDev : 0;
+    }
+
+    allDataWithZScores.push({
+      ...point,
+      premiumZScore: Number(zScore.toFixed(2))
+    });
+  }
+
+  // Now filter to the requested period
   const endDate = new Date();
   let startDate: Date;
   
@@ -141,28 +163,5 @@ export async function fetchJnkPremiumData(period: string = '2y'): Promise<JnkPre
   }
 
   const startStr = format(startDate, 'yyyy-MM-dd');
-  const filteredData = rawData.filter(d => d.date >= startStr);
-
-  const premiumHistory: number[] = [];
-  const result: JnkPremiumDataPoint[] = [];
-
-  for (const point of filteredData) {
-    premiumHistory.push(point.premium);
-    
-    let zScore = 0;
-    if (premiumHistory.length >= WINDOW_SIZE) {
-      const window = premiumHistory.slice(-WINDOW_SIZE);
-      const mean = window.reduce((a, b) => a + b, 0) / WINDOW_SIZE;
-      const variance = window.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / WINDOW_SIZE;
-      const stdDev = Math.sqrt(variance);
-      zScore = stdDev > 0 ? (point.premium - mean) / stdDev : 0;
-    }
-
-    result.push({
-      ...point,
-      premiumZScore: Number(zScore.toFixed(2))
-    });
-  }
-
-  return result;
+  return allDataWithZScores.filter(d => d.date >= startStr);
 }
