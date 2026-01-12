@@ -267,7 +267,7 @@ export default function JnkPremium() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Premium/Discount Z-Score (Rolling 1-Year)</CardTitle>
+          <CardTitle>Premium/Discount Z-Score (Rolling 1-Year) *limited data so you only get the last 4 days of Z scores</CardTitle>
           <CardDescription>Standard deviations from the mean ({zScoreData.length} data points)</CardDescription>
         </CardHeader>
         <CardContent>
