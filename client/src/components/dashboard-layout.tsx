@@ -81,7 +81,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
         >
           <Activity className="h-4 w-4" />
-          detailed information about all the indicators
+          Detailed information about all the indicators
         </a>
         <Link href="/admin">
           <div className={cn(
