@@ -37,11 +37,13 @@ export async function registerRoutes(
     }
   });
 
+  const ADMIN_EMAIL = 'john.w.whittington@gmail.com';
+
   app.get("/api/admin/allowed-emails", isAuthenticated, async (req: any, res) => {
     try {
       const userEmail = req.user?.claims?.email;
-      if (!userEmail || !(await storage.isEmailAllowed(userEmail))) {
-        return res.status(403).json({ error: 'Access denied' });
+      if (!userEmail || userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied: Admin only' });
       }
       const emails = await storage.getAllowedEmails();
       res.json(emails);
@@ -54,8 +56,8 @@ export async function registerRoutes(
   app.post("/api/admin/allowed-emails", isAuthenticated, async (req: any, res) => {
     try {
       const userEmail = req.user?.claims?.email;
-      if (!userEmail || !(await storage.isEmailAllowed(userEmail))) {
-        return res.status(403).json({ error: 'Access denied' });
+      if (!userEmail || userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied: Admin only' });
       }
       const { email } = req.body;
       if (!email || typeof email !== 'string') {
@@ -72,8 +74,8 @@ export async function registerRoutes(
   app.delete("/api/admin/allowed-emails/:email", isAuthenticated, async (req: any, res) => {
     try {
       const userEmail = req.user?.claims?.email;
-      if (!userEmail || !(await storage.isEmailAllowed(userEmail))) {
-        return res.status(403).json({ error: 'Access denied' });
+      if (!userEmail || userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied: Admin only' });
       }
       const emailToRemove = decodeURIComponent(req.params.email);
       if (emailToRemove.toLowerCase() === userEmail.toLowerCase()) {
