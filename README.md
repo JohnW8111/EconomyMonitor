@@ -38,7 +38,7 @@ RiskTerminal monitors 9 financial indicators across different risk categories:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/risk-terminal.git
+git clone https://github.com/JohnW8111/EconomyMonitor.git
 cd risk-terminal
 ```
 
